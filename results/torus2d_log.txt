@@ -1,0 +1,12 @@
+seed 0 amortized_S2_h128   2.5 ms/step  steps 6000  train   14.7s  held-out -121.61  kappa 2.89  latent err 0.136
+seed 0 amortized_S4_h256   4.9 ms/step  steps 6000  train   29.3s  held-out -118.96  kappa 3.09  latent err 0.071
+seed 0 qmc_M1024       7.3 ms/step  steps 3000  train   21.8s  held-out -118.14  kappa 3.93  latent err 0.043
+seed 0 qmc_M4096      31.5 ms/step  steps 2000  train   63.0s  held-out -118.16  kappa 3.94  latent err 0.047
+seed 0 grid_G32        6.9 ms/step  steps 3000  train   20.6s  held-out -118.33  kappa 3.91  latent err 0.064
+seed 0 grid_G64       33.1 ms/step  steps 2000  train   66.1s  held-out -118.15  kappa 3.93  latent err 0.047
+seed 1 amortized_S2_h128   3.2 ms/step  steps 6000  train   19.1s  held-out -118.43  kappa 3.23  latent err 0.113
+seed 1 amortized_S4_h256   5.4 ms/step  steps 6000  train   32.5s  held-out -116.41  kappa 3.36  latent err 0.055
+seed 1 qmc_M1024       7.3 ms/step  steps 3000  train   21.9s  held-out -115.65  kappa 3.92  latent err 0.047
+seed 1 qmc_M4096      32.4 ms/step  steps 2000  train   64.8s  held-out -115.68  kappa 3.95  latent err 0.044
+seed 1 grid_G32        7.0 ms/step  steps 3000  train   21.0s  held-out -115.77  kappa 3.92  latent err 0.060
+seed 1 grid_G64       31.4 ms/step  steps 2000  train   62.8s  held-out -115.69  kappa 3.95  latent err 0.047

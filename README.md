@@ -38,7 +38,7 @@ mu0, rho0, _ = ae.posterior(params, cfg, feat, d["b"], d["cond"], use_behavior=F
 
 `tests/test_model.py` checks the derivation without training: the ELBO is a lower bound on the exact grid log marginal, it is tight at the exact posterior, the joint and conditional-prior forms agree, the uniform-prior normalizer is constant, the gate limits behave, and the von Mises product adds complex parameters.
 
-`tests/test_smoke.py` trains on simulated data with loose thresholds. `tests/test_examples.py` checks the shared-latent simulator and that conventional tuning flattens with noise.
+`tests/test_torus2d.py` checks that the grid and quasi-Monte Carlo integrators agree and that the amortized loss has finite gradients. `tests/test_smoke.py` trains on simulated data with loose thresholds. `tests/test_examples.py` checks the shared-latent simulator and that conventional tuning flattens with noise.
 
 ## Smoke-test results
 
@@ -135,6 +135,28 @@ What this shows:
 - The convergence advantage over the Adam baseline does not survive a better optimizer. Amortized Adam reaches held-out -57.29 in 600 steps and 4.3 s, which is about what L-BFGS on the baseline needs.
 - The baseline's plateau at -57.28 is not a sampling artifact: the exact grid marginal optimized directly gives the same train and held-out scores. The amortized ELBO fit has a slightly worse train score (-55.71) and a better held-out score (-57.05), so it generalizes better on this fold. The mechanism is not tested. The ELBO may act as an implicit regularizer. The learned prior is not the cause (held-out -57.05 with it, -57.03 without).
 
+## Two-dimensional latent
+
+The one-dimensional ring is the easy case for integration, so this test uses a torus latent (`amortized_eiv/torus2d.py`, `scripts/benchmark_torus2d.py`, about 11 minutes). N = 60 neurons, T = 2000 bins (1600 train, 400 held-out), true kappa = 4 on each axis, a 2D Fourier-basis decoder with 24 frequencies, a uniform prior, minibatch 512, Adam, and kappa learned by gradient for every method. The amortized model uses a Gaussian posterior with reparameterized samples, so its cost per step does not depend on the number of integration points. The baselines integrate the latent with quasi-Monte Carlo points (a 2D Roberts sequence) or an exact grid. Every method is scored with the same fixed 96 x 96 grid, and every method starts from the same supervised Poisson fit of tuning curves to behavior, as the preprint does. Without that initialization, the three methods that finished in an aborted first run ended with learned kappa near 1 and latent error of 0.7 to 1.0 rad. Training times exclude compilation and evaluation.
+
+Two data seeds. The first amortized configuration (S = 4 samples, hidden width 256) was chosen by looking at seed 0's held-out score, so seed 0 is tuned for it and seed 1 is a clean check. Entries are seed 0 / seed 1.
+
+| Method | ms per step | Held-out log p(y given b) | Learned kappa (true 4) | Latent error (rad) |
+| --- | --- | --- | --- | --- |
+| Amortized, S = 2, width 128 | 2.5 / 3.2 | -121.61 / -118.43 | 2.89 / 3.23 | 0.136 / 0.113 |
+| Amortized, S = 4, width 256 | 4.9 / 5.4 | -118.96 / -116.41 | 3.09 / 3.36 | 0.071 / 0.055 |
+| QMC, M = 1024 | 7.3 / 7.3 | -118.14 / -115.65 | 3.93 / 3.92 | 0.043 / 0.047 |
+| QMC, M = 4096 | 31.5 / 32.4 | -118.16 / -115.68 | 3.94 / 3.95 | 0.047 / 0.044 |
+| Exact grid, 32 x 32 | 6.9 / 7.0 | -118.33 / -115.77 | 3.91 / 3.92 | 0.064 / 0.060 |
+| Exact grid, 64 x 64 | 33.1 / 31.4 | -118.15 / -115.69 | 3.93 / 3.95 | 0.047 / 0.047 |
+
+Raw behavior has a mean error of 0.43 rad on the held-out bins. Latent error is the exact-posterior mean under each method's own fitted decoder and kappa. Steps were 6000 for the amortized models, 3000 for the 1024-point baselines, and 2000 for the 4096-point baselines.
+
+- The amortized model is cheaper per step: 2.5 to 5.4 ms against 7 ms for 1024 points and 31 to 33 ms for 4096 points.
+- It does not match the baselines' fit. The larger encoder is about 0.8 nats per bin worse on held-out score on both seeds, and the smaller one is 2.8 to 3.5 worse. The baselines come within 0.5 nats of their best score in 1.7 to 1.8 s (1024 points) or 7 to 8 s (4096 points). The amortized model never gets there in 6000 steps.
+- Learned kappa is biased low, 2.9 to 3.4 against a true 4, while all four integrator baselines recover 3.9 to 3.95. The encoder's own latent error (0.18 to 0.31 rad) is far above the exact posterior's (0.04 to 0.07). This is the amortization gap, and it pulls kappa down as described in the derivation.
+- 1024 points are already enough in 2D (a 32 x 32 grid is within 0.2 nats of 64 x 64), so the integrators are not the bottleneck yet. The expected crossover is at higher dimension. A 3D latent needs about 32 times the points at the same resolution. That case is untested.
+
 ## Known limitations
 
 - kappa is biased low when neural information is weak. With N = 8 the cleanest condition gives 3.7 against a true 8. A 9000-step run stays near 3.8, so this is not slow convergence. The cause is not isolated. A broad posterior pulls the kappa update down, which fits the mechanism described above, but this is a hypothesis.
@@ -143,6 +165,6 @@ What this shows:
 - In the uncorrelated case (kappa = 0) the latent is identified only up to rotation and reflection, and a residual warp remains after alignment (0.39 rad).
 - Simulated data only. Simulated tuning curves are von Mises bumps, not draws from the model's own prior.
 - Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparison uses stand-in baselines. An L-BFGS baseline was tried and the preprint's own implementation was not.
-- The speed results are from one dataset, one fold, and a one-dimensional latent. Amortization is expected to matter for higher-dimensional latents, and that is untested.
+- The speed results are from one dataset, one fold, and a one-dimensional latent. In a 2D torus latent the amortized model was cheaper per step but did not match the integrators' fit quality or recover kappa. Latents of three or more dimensions are untested.
 - One kappa per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The latent is one-dimensional (a ring grid).
 - Grid discretization (G = 128) is a fixed approximation.
