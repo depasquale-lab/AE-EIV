@@ -92,37 +92,48 @@ Differences from the preprint's protocol: the tuning prior is a periodic squared
 
 ## Speed
 
-Measured on one CPU thread with T_train = 800, N = 30, and kappa = 3 (`scripts/benchmark_speed.py`, `scripts/convergence_diagnostics.py`). The comparison baseline is a stand-in written for this test, not the preprint's code: the same decoder, quasi-Monte Carlo points from a Roberts sequence over the latent, Adam, and kappa fixed. Wall times include JIT compilation of about 2 to 3 seconds.
+Measured on one CPU thread with T_train = 800, N = 30, and kappa = 3 (`scripts/benchmark_speed.py`, `scripts/convergence_diagnostics.py`, `scripts/lbfgs_baseline.py`). The comparison baselines are stand-ins written for these tests, not the preprint's code: the same decoder with no encoder, with the latent integrated by quasi-Monte Carlo points from a Roberts sequence (`fit_qmc`) or by an exact sum on a grid (`fit_grid`). Wall times include JIT compilation of about 2 to 3 seconds unless noted.
 
-Cost per optimizer step:
+Cost per optimizer step (one run; the 1024-point QMC step measured 3.8 ms in an earlier run, so expect run-to-run variation of this size on a shared CPU):
 
 | Method | ms per step |
 | --- | --- |
-| Amortized encoder, grid G = 128 | 4.1 |
+| Amortized encoder, grid G = 128 | 3.9 |
 | Exact grid marginal, no encoder, G = 128 | 1.9 |
-| Quasi-Monte Carlo, M = 1024 | 3.8 |
-| Quasi-Monte Carlo, M = 128 | 0.78 |
+| Quasi-Monte Carlo, M = 1024 | 6.6 |
+| Quasi-Monte Carlo, M = 128 | 1.2 |
 
-Held-out log p(y | b) per bin against training time, one random fold:
+Learning kappa in one fit (3000 steps, true kappa = 3):
+
+| Method | Wall time (s) | Learned kappa | Held-out |
+| --- | --- | --- | --- |
+| Amortized, learned prior | 17.1 | 3.05 | -57.09 |
+| Exact grid, no encoder, learned prior | 8.5 | 2.75 | -57.24 |
+| Quasi-Monte Carlo, M = 1024 | 22.1 | 2.79 | -57.33 |
+| Quasi-Monte Carlo, M = 128 | 5.8 | 2.74 | -57.29 |
+
+The preprint's protocol is a 9-point kappa grid with 2 folds, which is 18 fits. That is about 112 s for the 1024-point baseline, extrapolated from one fit.
+
+Held-out log p(y | b) per bin against training time at fixed kappa, one random fold, Adam for all rows:
 
 | Method | Steps | Wall time (s) | Train | Held-out |
 | --- | --- | --- | --- | --- |
-| Amortized | 300 | 2.9 | -56.44 | -57.57 |
-| Amortized | 600 | 3.9 | -56.08 | -57.29 |
-| Amortized | 1200 | 6.1 | -55.71 | -57.05 |
-| Quasi-Monte Carlo, M = 1024 | 1200 | 7.7 | -56.25 | -57.68 |
-| Quasi-Monte Carlo, M = 1024 | 4000 | 18.3 | -55.64 | -57.28 |
-| Quasi-Monte Carlo, M = 1024 | 10000 | 46.4 | -55.64 | -57.28 |
+| Amortized | 300 | 3.1 | -56.44 | -57.57 |
+| Amortized | 600 | 4.3 | -56.08 | -57.29 |
+| Amortized | 1200 | 6.6 | -55.71 | -57.05 |
+| Quasi-Monte Carlo, M = 1024 | 1200 | 7.6 | -56.25 | -57.68 |
+| Quasi-Monte Carlo, M = 1024 | 4000 | 19.4 | -55.64 | -57.28 |
+| Quasi-Monte Carlo, M = 1024 | 10000 | 52.1 | -55.64 | -57.28 |
 | Exact grid marginal, optimized directly | 4000 | | -55.65 | -57.28 |
 
-Choosing kappa: one free-kappa fit takes 17.7 s (3000 steps, kappa = 3.05 against a true 3.0). The preprint's protocol of a 9-point kappa grid with 2 folds is 18 fits, about 110 s for the baseline, extrapolated from one fit. The same grid protocol with the amortized model costs about the same, so this saving comes from learning kappa and not from the encoder.
+With L-BFGS on the deterministic 1024-point marginal likelihood, the baseline reaches held-out -57.29 in 320 iterations. That is about 1.3 s of compute at 4.1 ms per iteration, plus about 4 s of compilation and warm-up.
 
 What this shows:
 
-- Per step, the amortized model is no faster. In one dimension the grid marginal is exact, so the encoder adds cost and is not needed for the likelihood. The cheap speedup is fewer integration points: M = 128 is 5 times cheaper per step than M = 1024.
-- Learning kappa jointly is about 6 times cheaper than a grid with folds.
-- The amortized fit reaches the baseline's plateau (held-out -57.28) in 600 steps and 3.9 s, against 4000 steps and 18 s, and then goes further to -57.05.
-- The baseline's plateau is not a sampling artifact. The exact grid marginal optimized directly reaches the same train and held-out values. The amortized ELBO fit has a slightly worse train score (-55.71) and a better held-out score, so it generalizes better on this fold. The mechanism is not tested. The ELBO may act as an implicit regularizer. The learned prior is not the cause (held-out -57.05 with it, -57.03 without).
+- The amortized model is not faster in this setting. Per step it is cheaper than 1024-point QMC only because it uses 128 grid points. In one dimension the grid marginal is exact, so the encoder roughly doubles the cost per step and is not needed for the likelihood.
+- Learning kappa jointly is about 6 times cheaper than the grid-with-folds protocol, but the baselines can do the same with a learned kappa (5.8 to 22 s). The saving does not come from amortization. The amortized fit is the slowest of the four, and its kappa estimate (3.05) and held-out score are the best.
+- The convergence advantage over the Adam baseline does not survive a better optimizer. Amortized Adam reaches held-out -57.29 in 600 steps and 4.3 s, which is about what L-BFGS on the baseline needs.
+- The baseline's plateau at -57.28 is not a sampling artifact: the exact grid marginal optimized directly gives the same train and held-out scores. The amortized ELBO fit has a slightly worse train score (-55.71) and a better held-out score (-57.05), so it generalizes better on this fold. The mechanism is not tested. The ELBO may act as an implicit regularizer. The learned prior is not the cause (held-out -57.05 with it, -57.03 without).
 
 ## Known limitations
 
@@ -131,7 +142,7 @@ What this shows:
 - In the kappa = 3 reproduction, 5% of bins (latent between about -0.2 and 1.05 rad, a sparsely visited stretch) are mislocated by more than 0.5 rad. The latent is warped over that stretch. This is plausibly a local optimum and was not investigated.
 - In the uncorrelated case (kappa = 0) the latent is identified only up to rotation and reflection, and a residual warp remains after alignment (0.39 rad).
 - Simulated data only. Simulated tuning curves are von Mises bumps, not draws from the model's own prior.
-- Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparison uses a stand-in baseline with Adam. The preprint's implementation may use L-BFGS, which could change the convergence comparison.
+- Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparison uses stand-in baselines. An L-BFGS baseline was tried and the preprint's own implementation was not.
 - The speed results are from one dataset, one fold, and a one-dimensional latent. Amortization is expected to matter for higher-dimensional latents, and that is untested.
 - One kappa per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The latent is one-dimensional (a ring grid).
 - Grid discretization (G = 128) is a fixed approximation.

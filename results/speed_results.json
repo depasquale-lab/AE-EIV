@@ -3,63 +3,63 @@
   "N": 30,
   "steps_fixed_kappa": 1200,
   "steady_ms_per_step": {
-    "amortized_encoder_G128": 4.013635606666715,
-    "exact_grid_marginal_no_encoder_G128": 1.861047586666776,
-    "qmc_M1024_fixed_kappa": 6.078882906666649,
-    "qmc_M128_fixed_kappa": 1.128237019999953
+    "amortized_encoder_G128": 3.940954153333299,
+    "exact_grid_marginal_no_encoder_G128": 1.8524728466666336,
+    "qmc_M1024_fixed_kappa": 6.602857453333304,
+    "qmc_M128_fixed_kappa": 1.1634459600000469
   },
   "fits": {
     "amortized_fixed_kappa_1200": {
-      "wall_s": 6.13,
+      "wall_s": 6.42,
       "heldout": -57.046,
       "kappa": 3.0
     },
     "amortized_free_kappa_3000": {
-      "wall_s": 17.11,
+      "wall_s": 17.14,
       "heldout": -57.094,
       "kappa": 3.054
     },
     "exact_grid_fixed_kappa_uniform_prior_1200": {
-      "wall_s": 2.71,
+      "wall_s": 2.79,
       "heldout": -57.7,
       "kappa": 3.0
     },
     "exact_grid_fixed_kappa_learned_prior_1200": {
-      "wall_s": 2.89,
+      "wall_s": 2.98,
       "heldout": -57.483,
       "kappa": 3.0
     },
     "exact_grid_free_kappa_learned_prior_3000": {
-      "wall_s": 7.94,
+      "wall_s": 8.51,
       "heldout": -57.24,
       "kappa": 2.754
     },
     "qmc_M1024_fixed_kappa_1200": {
-      "wall_s": 5.73,
+      "wall_s": 6.24,
       "heldout": -57.675,
       "kappa": 3.0
     },
     "qmc_M1024_free_kappa_3000": {
-      "wall_s": 23.08,
+      "wall_s": 22.1,
       "heldout": -57.329,
       "kappa": 2.791
     },
     "qmc_M128_fixed_kappa_1200": {
-      "wall_s": 5.75,
+      "wall_s": 2.39,
       "heldout": -57.661,
       "kappa": 3.0
     },
     "qmc_M128_free_kappa_3000": {
-      "wall_s": 16.02,
+      "wall_s": 5.75,
       "heldout": -57.287,
       "kappa": 2.735
     }
   },
   "kappa_selection_wall_s": {
     "grid_x_folds": 18,
-    "preprint_style_qmc_M1024_grid_cv_extrapolated": 103.1,
-    "amortized_model_grid_cv_extrapolated": 110.3,
-    "amortized_single_free_kappa_fit": 17.11,
-    "qmc_M1024_single_free_kappa_fit": 23.08
+    "preprint_style_qmc_M1024_grid_cv_extrapolated": 112.3,
+    "amortized_model_grid_cv_extrapolated": 115.6,
+    "amortized_single_free_kappa_fit": 17.14,
+    "qmc_M1024_single_free_kappa_fit": 22.1
   }
 }
