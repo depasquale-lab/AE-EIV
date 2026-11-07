@@ -1,0 +1,322 @@
+{
+  "strong": {
+    "kappa8": {
+      "gated_encoder": [
+        {
+          "kappa": 8.119111061096191,
+          "heldout": -56.35538864135742,
+          "behavior_decode_err": 0.07296537816098175,
+          "raw_behavior_err": 0.2540597367993231,
+          "behavior_decode_err_gate_on": 0.07161052304376327
+        },
+        {
+          "kappa": 7.892733573913574,
+          "heldout": -56.7700080871582,
+          "behavior_decode_err": 0.07395937789013143,
+          "raw_behavior_err": 0.30040960341024125,
+          "behavior_decode_err_gate_on": 0.0726405121434075
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 7.935158729553223,
+          "heldout": -56.35071563720703,
+          "behavior_decode_err": 0.07251278422074077,
+          "raw_behavior_err": 0.2540597367993231,
+          "behavior_decode_err_gate_on": 0.06977502887469304
+        },
+        {
+          "kappa": 7.676360607147217,
+          "heldout": -56.7694091796875,
+          "behavior_decode_err": 0.07120564502495898,
+          "raw_behavior_err": 0.30040960341024125,
+          "behavior_decode_err_gate_on": 0.06964167906018189
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 8.054118156433105,
+          "heldout": -56.33760452270508,
+          "behavior_decode_err": 0.07225660645179911,
+          "raw_behavior_err": 0.2540597367993231,
+          "behavior_decode_err_gate_on": 0.07323406721805135
+        },
+        {
+          "kappa": 7.731770992279053,
+          "heldout": -56.777713775634766,
+          "behavior_decode_err": 0.07347953287667428,
+          "raw_behavior_err": 0.30040960341024125,
+          "behavior_decode_err_gate_on": 0.07308151952395138
+        }
+      ]
+    },
+    "kappa3": {
+      "gated_encoder": [
+        {
+          "kappa": 2.8978562355041504,
+          "heldout": -57.0994873046875,
+          "behavior_decode_err": 0.07462403090048099,
+          "raw_behavior_err": 0.5420705768595667,
+          "behavior_decode_err_gate_on": 0.07322112468704237
+        },
+        {
+          "kappa": 3.007469415664673,
+          "heldout": -57.27492904663086,
+          "behavior_decode_err": 0.08422997572575978,
+          "raw_behavior_err": 0.5311616221783539,
+          "behavior_decode_err_gate_on": 0.08489196198071798
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 2.885289192199707,
+          "heldout": -57.0965461730957,
+          "behavior_decode_err": 0.07595615951406988,
+          "raw_behavior_err": 0.5420705768595667,
+          "behavior_decode_err_gate_on": 0.073920610867895
+        },
+        {
+          "kappa": 2.985767364501953,
+          "heldout": -57.274417877197266,
+          "behavior_decode_err": 0.07510969671325622,
+          "raw_behavior_err": 0.5311616221783539,
+          "behavior_decode_err_gate_on": 0.07556767994169798
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 2.904218912124634,
+          "heldout": -57.093509674072266,
+          "behavior_decode_err": 0.0744913444156382,
+          "raw_behavior_err": 0.5420705768595667,
+          "behavior_decode_err_gate_on": 0.07197272712427594
+        },
+        {
+          "kappa": 3.0009782314300537,
+          "heldout": -57.283084869384766,
+          "behavior_decode_err": 0.0902695121084776,
+          "raw_behavior_err": 0.5311616221783539,
+          "behavior_decode_err_gate_on": 0.09095668079872424
+        }
+      ]
+    },
+    "kappa0.5": {
+      "gated_encoder": [
+        {
+          "kappa": 0.42553889751434326,
+          "heldout": -57.86508560180664,
+          "behavior_decode_err": 0.26141510921733435,
+          "raw_behavior_err": 1.3107188153939113,
+          "behavior_decode_err_gate_on": 0.26129588308015816
+        },
+        {
+          "kappa": 0.4167667031288147,
+          "heldout": -58.07009506225586,
+          "behavior_decode_err": 0.3409939657505692,
+          "raw_behavior_err": 1.325282251612117,
+          "behavior_decode_err_gate_on": 0.34073500635615517
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 0.410896897315979,
+          "heldout": -57.75990295410156,
+          "behavior_decode_err": 0.2209993332807294,
+          "raw_behavior_err": 1.3107188153939113,
+          "behavior_decode_err_gate_on": 0.22084442052606892
+        },
+        {
+          "kappa": 0.11784545332193375,
+          "heldout": -58.143226623535156,
+          "behavior_decode_err": 1.480255088973159,
+          "raw_behavior_err": 1.325282251612117,
+          "behavior_decode_err_gate_on": 1.4801504347094538
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 0.44522467255592346,
+          "heldout": -57.754188537597656,
+          "behavior_decode_err": 0.21948183903207538,
+          "raw_behavior_err": 1.3107188153939113,
+          "behavior_decode_err_gate_on": 0.21954104648639913
+        },
+        {
+          "kappa": 0.4016847610473633,
+          "heldout": -58.11100769042969,
+          "behavior_decode_err": 0.25533118569376145,
+          "raw_behavior_err": 1.325282251612117,
+          "behavior_decode_err_gate_on": 0.2555373956966174
+        }
+      ]
+    }
+  },
+  "weak": {
+    "kappa8": {
+      "gated_encoder": [
+        {
+          "kappa": 5.606564998626709,
+          "heldout": -8.373196601867676,
+          "behavior_decode_err": 0.5472044798068358,
+          "raw_behavior_err": 0.30464900491693253,
+          "behavior_decode_err_gate_on": 0.2831198290142176
+        },
+        {
+          "kappa": 5.335986137390137,
+          "heldout": -8.392740249633789,
+          "behavior_decode_err": 0.6079055074011754,
+          "raw_behavior_err": 0.2703031335554583,
+          "behavior_decode_err_gate_on": 0.33250655793563394
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 3.4219560623168945,
+          "heldout": -8.397522926330566,
+          "behavior_decode_err": 0.5848647604815519,
+          "raw_behavior_err": 0.30464900491693253,
+          "behavior_decode_err_gate_on": 0.37127035825221716
+        },
+        {
+          "kappa": 3.4699344635009766,
+          "heldout": -8.424052238464355,
+          "behavior_decode_err": 0.6877011044126724,
+          "raw_behavior_err": 0.2703031335554583,
+          "behavior_decode_err_gate_on": 0.48199308218706366
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 3.4033608436584473,
+          "heldout": -8.397422790527344,
+          "behavior_decode_err": 0.5597309137360458,
+          "raw_behavior_err": 0.30464900491693253,
+          "behavior_decode_err_gate_on": 0.4002057658027497
+        },
+        {
+          "kappa": 3.4694249629974365,
+          "heldout": -8.4245023727417,
+          "behavior_decode_err": 0.6838667962470352,
+          "raw_behavior_err": 0.2703031335554583,
+          "behavior_decode_err_gate_on": 0.5112689572218838
+        }
+      ]
+    },
+    "kappa3": {
+      "gated_encoder": [
+        {
+          "kappa": 2.5815577507019043,
+          "heldout": -8.612652778625488,
+          "behavior_decode_err": 0.5209021897065237,
+          "raw_behavior_err": 0.5272225738355677,
+          "behavior_decode_err_gate_on": 0.35514349290978187
+        },
+        {
+          "kappa": 2.6251986026763916,
+          "heldout": -8.607227325439453,
+          "behavior_decode_err": 0.5846797939716157,
+          "raw_behavior_err": 0.5134571470787727,
+          "behavior_decode_err_gate_on": 0.39417729766641246
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 2.201799154281616,
+          "heldout": -8.622600555419922,
+          "behavior_decode_err": 0.5632023077968895,
+          "raw_behavior_err": 0.5272225738355677,
+          "behavior_decode_err_gate_on": 0.4143742957647265
+        },
+        {
+          "kappa": 2.2639241218566895,
+          "heldout": -8.616972923278809,
+          "behavior_decode_err": 0.6049394901988311,
+          "raw_behavior_err": 0.5134571470787727,
+          "behavior_decode_err_gate_on": 0.46059950253750304
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 2.203594923019409,
+          "heldout": -8.619000434875488,
+          "behavior_decode_err": 0.5628347583288928,
+          "raw_behavior_err": 0.5272225738355677,
+          "behavior_decode_err_gate_on": 0.4249555403453133
+        },
+        {
+          "kappa": 2.271360158920288,
+          "heldout": -8.617011070251465,
+          "behavior_decode_err": 0.6001609146943797,
+          "raw_behavior_err": 0.5134571470787727,
+          "behavior_decode_err_gate_on": 0.4720187962724751
+        }
+      ]
+    }
+  },
+  "biased": {
+    "kappa6": {
+      "gated_encoder": [
+        {
+          "kappa": 5.608236312866211,
+          "heldout": -56.69632339477539,
+          "behavior_decode_err": 0.14790569710698998,
+          "raw_behavior_err": 0.3020076097112437,
+          "behavior_decode_err_gate_on": 0.14378595951048234
+        },
+        {
+          "kappa": 4.840120792388916,
+          "heldout": -57.08757781982422,
+          "behavior_decode_err": 0.17957645426020485,
+          "raw_behavior_err": 0.33506120522870064,
+          "behavior_decode_err_gate_on": 0.1739342149116242
+        }
+      ],
+      "neural_encoder_only": [
+        {
+          "kappa": 5.570155143737793,
+          "heldout": -56.69816589355469,
+          "behavior_decode_err": 0.1311147192247738,
+          "raw_behavior_err": 0.3020076097112437,
+          "behavior_decode_err_gate_on": 0.12746774265988234
+        },
+        {
+          "kappa": 4.777502059936523,
+          "heldout": -57.087493896484375,
+          "behavior_decode_err": 0.17547091114556296,
+          "raw_behavior_err": 0.33506120522870064,
+          "behavior_decode_err_gate_on": 0.17002861302506156
+        }
+      ],
+      "neural_encoder_only_warp": [
+        {
+          "kappa": 6.4107441902160645,
+          "heldout": -56.63877868652344,
+          "behavior_decode_err": 0.07622608473051287,
+          "raw_behavior_err": 0.3020076097112437,
+          "behavior_decode_err_gate_on": 0.07957994392809174
+        },
+        {
+          "kappa": 5.415220737457275,
+          "heldout": -56.98735809326172,
+          "behavior_decode_err": 0.0738807471993689,
+          "raw_behavior_err": 0.33506120522870064,
+          "behavior_decode_err_gate_on": 0.07553047849952083
+        }
+      ]
+    }
+  },
+  "noisy": {
+    "gated_encoder": {
+      "kappa": 0.10808907449245453,
+      "latent_err_aligned": 0.3437816929939654,
+      "mean_rate_r": 0.9877094018105497,
+      "covariance_r": 0.9974353829094078
+    },
+    "neural_encoder_only": {
+      "kappa": 0.11855655163526535,
+      "latent_err_aligned": 0.7606222142530599,
+      "mean_rate_r": 0.9855976162675967,
+      "covariance_r": 0.9961050565737399
+    }
+  }
+}

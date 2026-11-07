@@ -65,6 +65,7 @@ On the ring the latent lives on a grid of 128 points, so the ELBO is an exact su
 - When behavior is nearly noise, the fit reproduces the neural mean rates and covariance.
 - In one dimension the amortized model is not faster, except that learning κ in one fit is about 6 times cheaper than a grid over κ with folds. Baselines can learn κ too.
 - In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ.
+- A neural-only encoder with a separate behavior decoder (no behavior input) matches the gated encoder with strong neural information and loses with weak information. A learned behavior decoder helps when behavior is offset from the latent.
 - Replacing the Matérn-type tuning prior with an infinitely wide ReLU network kernel (NNGP) brings no gain over a smoother Matérn prior. Depth 1 fails when tuning curves have energy at odd harmonics above 1.
 
 ### Recovery on simulated ring data
@@ -224,6 +225,47 @@ Setup (`scripts/kernel_comparison.py`, `scripts/kernel_torus2d.py`, about 15 min
 
 In this test an architecture-derived prior brought no advantage over tuning the smoothness of the Matérn prior. Choosing the smoothness by cross-validation, as the preprint does for its kernel hyperparameters, is the better comparison and is untested.
 
+### Neural encoder only, with a separate behavior decoder
+
+The gated encoder ties the behavior input to the behavior decoder through a single κ. An alternative keeps two encoders and two decoders and drops the behavior encoder entirely. The encoder q(x | y) sees only neural activity. Behavior enters only through its decoder p(b | x), which is a von Mises density around the latent with concentration κ, or equivalently through the conditional prior p(x | b). When behavior is noisy, κ goes to 0 and the behavior term is flat. The model is then a neural encoder and decoder with a learned prior. When behavior is clean, the behavior decoder pulls the latent toward behavior, so behavior can be decoded from neural activity alone. In the code this is `fit(..., p_drop=1.0)`, which sets the gate to zero in every bin. The generative model is unchanged.
+
+A further option learns the behavior decoder. With `Config(beh_warp=3)` the mean direction of behavior is g(x) = x + w₀ + Σ (aₖ sin kx + cₖ cos kx), where the weights start at 0 so g starts as the identity. The gate cannot do this, because its behavior input assumes that behavior is centered on the latent.
+
+![Neural encoder only](figures/neural_encoder_variant.png)
+
+*Left: error of decoding mean behavior from neural activity alone, with strong neural information. Middle: learned κ with weak neural information, with the dashed line at the true value. Right: behavior generated as b = x + 0.4 + 0.5 sin x plus von Mises noise with κ = 6. Grey ticks are the error of the raw measured behavior against the noise-free mean.*
+
+Setup (`scripts/neural_encoder_variant.py`, about 12 minutes). Ring data with 80% of the bins for training and 20% for scoring, κ learned for 3000 steps, and 2 seeds. All variants are scored without the behavior input at test time: the error of g(μ(y)) against the noise-free mean behavior, which is known only in simulation, together with held-out log p(y | b) and learned κ. Strong neural information is N = 30 with GP tuning. Weak is N = 8 with low rates. In the offset data the mean behavior is b = x + 0.4 + 0.5 sin x.
+
+| Data, true κ | Variant | κ learned | Held-out log p(y given b) | Behavior-decode error (rad), seeds | Raw behavior error (rad) |
+| --- | --- | --- | --- | --- | --- |
+| strong neural information, 8.0 | Gated encoder | 8.01 | −56.563 | 0.073 (0.07, 0.07) | 0.277 |
+| strong neural information, 8.0 | Neural encoder only | 7.81 | −56.560 | 0.072 (0.07, 0.07) | 0.277 |
+| strong neural information, 8.0 | Neural encoder only, learned behavior decoder | 7.89 | −56.558 | 0.073 (0.07, 0.07) | 0.277 |
+| strong neural information, 3.0 | Gated encoder | 2.95 | −57.187 | 0.079 (0.07, 0.08) | 0.537 |
+| strong neural information, 3.0 | Neural encoder only | 2.94 | −57.185 | 0.076 (0.08, 0.08) | 0.537 |
+| strong neural information, 3.0 | Neural encoder only, learned behavior decoder | 2.95 | −57.188 | 0.082 (0.07, 0.09) | 0.537 |
+| strong neural information, 0.5 | Gated encoder | 0.42 | −57.968 | 0.301 (0.26, 0.34) | 1.318 |
+| strong neural information, 0.5 | Neural encoder only | 0.26 | −57.952 | 0.851 (0.22, 1.48) | 1.318 |
+| strong neural information, 0.5 | Neural encoder only, learned behavior decoder | 0.42 | −57.933 | 0.237 (0.22, 0.26) | 1.318 |
+| weak neural information, 8.0 | Gated encoder | 5.47 | −8.383 | 0.578 (0.55, 0.61) | 0.287 |
+| weak neural information, 8.0 | Neural encoder only | 3.45 | −8.411 | 0.636 (0.58, 0.69) | 0.287 |
+| weak neural information, 8.0 | Neural encoder only, learned behavior decoder | 3.44 | −8.411 | 0.622 (0.56, 0.68) | 0.287 |
+| weak neural information, 3.0 | Gated encoder | 2.60 | −8.610 | 0.553 (0.52, 0.58) | 0.520 |
+| weak neural information, 3.0 | Neural encoder only | 2.23 | −8.620 | 0.584 (0.56, 0.60) | 0.520 |
+| weak neural information, 3.0 | Neural encoder only, learned behavior decoder | 2.24 | −8.618 | 0.581 (0.56, 0.60) | 0.520 |
+| offset behavior, 6.0 | Gated encoder | 5.22 | −56.892 | 0.164 (0.15, 0.18) | 0.319 |
+| offset behavior, 6.0 | Neural encoder only | 5.17 | −56.893 | 0.153 (0.13, 0.18) | 0.319 |
+| offset behavior, 6.0 | Neural encoder only, learned behavior decoder | 5.91 | −56.813 | 0.075 (0.08, 0.07) | 0.319 |
+
+- With strong neural information the three variants are indistinguishable at κ = 8 and 3. Learned κ is 7.8 to 8.0 and 2.94 to 2.95, held-out scores agree to 3 decimals, and behavior-decode error is 0.07 to 0.08 rad against 0.28 to 0.54 for raw behavior.
+- At κ = 0.5 the neural-only encoder failed on one of two seeds (decode error 0.22 and 1.48, against 0.26 and 0.34 for the gated encoder). With no behavior input and little behavioral information, nothing pins the coordinate frame of the latent. Held-out score is unaffected, since behavior says little about y at low κ. This is two seeds and is an observation, not a rate.
+- With weak neural information the neural-only encoder is worse. Learned κ is 3.45 against 5.47 at true κ = 8, and 2.23 against 2.60 at 3. Decode error is 0.64 against 0.58, and 0.58 against 0.55. Held-out differs by 0.03 and 0.01 nats per bin. This is the amortization gap again. An encoder that must infer x from few spikes underestimates κ, and the gate helps by supplying behavior.
+- The learned behavior decoder helps when behavior is offset from the latent. Behavior-decode error is 0.075 against 0.15 to 0.16 with the identity decoder, learned κ is 5.91 against 5.2 (true 6), and held-out is 0.08 nats per bin better. The tuning curves absorb part of an offset, which is why the identity versions are not worse by more. The gated encoder has no way to represent the offset.
+- With nearly noise behavior (κ = 0.1, T = 3000, one seed) both variants become neural generative models. Learned κ is 0.108 and 0.119. Samples from the learned prior match the data in mean rate (r = 0.988 and 0.986) and neural covariance (r = 0.997 and 0.996). The aligned latent error differs, at 0.34 and 0.76 rad. The runs differ in their training-time gate and random stream, so I treat that as run-to-run variation, and it was not tested.
+
+The neural-encoder-only formulation matches the gated encoder when neural information is strong and loses when it is weak. It is the more general of the two, because its behavior decoder is separate and can be learned.
+
 ## Known limitations
 
 - κ is biased low when neural information is weak. With N = 8 the cleanest condition gives 3.7 against a true 8, and a 9000-step run stays near 3.8, so this is not slow convergence. The cause is not isolated. A broad posterior pulls the κ update down, which fits the mechanism above, but this is a hypothesis.
@@ -234,6 +276,7 @@ In this test an architecture-derived prior brought no advantage over tuning the 
 - Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparisons use stand-in baselines, and an L-BFGS baseline was tried. The preprint's own implementation was not.
 - The speed results are from one dataset, one fold, and a one-dimensional latent. In the 2D torus the amortized model was cheaper per step but did not match the integrators' fit quality or recover κ. Latents of three or more dimensions are untested.
 - The kernel comparison uses two seeds and simulated data. The default Matérn hyperparameters were not tuned, and only a ReLU network without bias was tried, with depth as the only architecture choice. Real tuning curves were not tested.
+- The neural-encoder-only comparison uses two seeds and simulated data. The learned behavior decoder has 3 harmonics, and the offset it recovers was built into the simulation.
 - One κ per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The ring latent is a grid of 128 points, a fixed approximation.
 
 ## Reproduce
@@ -251,6 +294,7 @@ python scripts/benchmark_torus2d.py     # 2D torus benchmark, about 11 minutes
 python scripts/kernel_comparison.py     # ring tuning-prior comparison, about 10 minutes
 python scripts/kernel_comparison.py --control   # Matérn smoothness control, about 3 minutes
 python scripts/kernel_torus2d.py        # torus tuning-prior comparison, about 5 minutes
+python scripts/neural_encoder_variant.py   # neural-only encoder and learned behavior decoder, about 12 minutes
 python scripts/make_figures.py          # rebuild figures/ from the saved results
 ```
 
@@ -269,6 +313,6 @@ mu0, rho0, _ = ae.posterior(params, cfg, feat, d["b"], d["cond"], use_behavior=F
 | `amortized_eiv/baseline.py` | Quasi-Monte Carlo and exact-grid baselines |
 | `amortized_eiv/kernels.py` | Tuning priors: Matérn-type and ReLU NNGP spectra |
 | `amortized_eiv/experiments.py`, `simulate.py` | Experiments and simulators |
-| `tests/` | Derivation checks, smoke tests, simulator tests, 2D tests, kernel tests |
+| `tests/` | Derivation checks, smoke tests, simulator tests, 2D tests, kernel tests, behavior-decoder tests |
 | `results/` | Saved results, logs, and the Fig 1 and Fig 2 reproductions |
 | `figures/` | Figures used in this README |

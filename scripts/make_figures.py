@@ -366,6 +366,60 @@ def fig_kernel_results():
     plt.close(fig)
 
 
+# --------------------------------------------------- neural-encoder-only variant
+
+VCOL = {"gated_encoder": "#1f5fa8", "neural_encoder_only": "#e08a1e", "neural_encoder_only_warp": "#2e9e5b"}
+VLAB = {"gated_encoder": "gated encoder", "neural_encoder_only": "neural encoder only",
+        "neural_encoder_only_warp": "neural encoder only + learned behavior decoder"}
+
+
+def fig_variant():
+    r = json.load(open("results/neural_encoder_variant.json"))
+    names = list(VCOL)
+    fig, axs = plt.subplots(1, 3, figsize=(16, 4.3), gridspec_kw={"wspace": 0.32})
+    w = 0.26
+
+    def bars(ax, x, key, metric, per_seed=True):
+        for ni, n in enumerate(names):
+            vals = [x_[metric] for x_ in r[key[0]][key[1]][n]]
+            ax.bar(x + (ni - 1) * w, np.mean(vals), w, color=VCOL[n])
+            if per_seed: ax.scatter([x + (ni - 1) * w] * len(vals), vals, color="#444444", s=10, zorder=3)
+
+    ax = axs[0]
+    ks = ["kappa8", "kappa3", "kappa0.5"]
+    for ci, k in enumerate(ks):
+        bars(ax, ci, ("strong", k), "behavior_decode_err")
+        raw = np.mean([x["raw_behavior_err"] for x in r["strong"][k]["gated_encoder"]])
+        ax.scatter([ci], [raw], marker="_", s=500, color="#888888", zorder=2)
+    ax.set_xticks(range(3)); ax.set_xticklabels(["κ = 8", "κ = 3", "κ = 0.5"])
+    ax.set_ylabel("error decoding behavior from neural activity (rad)")
+    ax.set_title("Strong neural information (N = 30)", loc="left")
+    ax = axs[1]
+    for ci, k in enumerate(["kappa8", "kappa3"]):
+        bars(ax, ci, ("weak", k), "kappa")
+        ax.hlines(float(k[5:]), ci - 0.45, ci + 0.45, color="#222222", ls="--", lw=1)
+    ax.set_xticks(range(2)); ax.set_xticklabels(["true κ = 8", "true κ = 3"]); ax.set_ylabel("learned κ")
+    ax.set_title("Weak neural information (N = 8): learned κ", loc="left")
+    ax = axs[2]
+    bars(ax, 0, ("biased", "kappa6"), "behavior_decode_err")
+    raw = np.mean([x["raw_behavior_err"] for x in r["biased"]["kappa6"]["gated_encoder"]])
+    ax.scatter([0], [raw], marker="_", s=500, color="#888888", zorder=2)
+    for ni, n in enumerate(names):
+        k = np.mean([x["kappa"] for x in r["biased"]["kappa6"][n]])
+        ax.text((ni - 1) * w, 0.003, f"κ {k:.1f}", ha="center", va="bottom", fontsize=8, color="white")
+    ax.set_xticks([0]); ax.set_xticklabels(["b = x + 0.4 + 0.5 sin x, κ = 6"])
+    ax.set_xlim(-0.6, 0.6); ax.set_ylabel("error decoding mean behavior from neural activity (rad)")
+    ax.set_title("Systematic offset between latent and behavior", loc="left")
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    handles = [Patch(color=VCOL[n], label=VLAB[n]) for n in names] + [
+        Line2D([], [], color="#888888", marker="_", ms=14, ls="", label="raw measured behavior (panels 1 and 3)"),
+        Line2D([], [], color="#444444", marker="o", ms=4, ls="", label="single seed (bars are means)")]
+    fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, fontsize=8, bbox_to_anchor=(0.5, -0.1))
+    fig.savefig(f"{OUT}/neural_encoder_variant.png")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     which = sys.argv[1:] or ["model", "gate", "smoke", "noisy", "speed", "torus"]
     if "model" in which: fig_model()
@@ -376,3 +430,4 @@ if __name__ == "__main__":
     if "torus" in which: fig_torus2d()
     if "kernels" in which: fig_kernels()
     if "kernelresults" in which: fig_kernel_results()
+    if "variant" in which: fig_variant()

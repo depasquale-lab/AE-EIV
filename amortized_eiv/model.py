@@ -44,6 +44,8 @@ class Config:
     learn_prior: bool = True
     kernel: str = "matern"      # prior on tuning-curve weights: "matern" or "nngp"
     depth: int = 1              # ReLU network depth for kernel = "nngp"
+    beh_warp: int = 0           # harmonics of a learned map from latent to mean behavior (0 = identity)
+    warp_sd: float = 0.5        # prior scale of the warp coefficients
 
 
 def log_i0(k):
@@ -83,7 +85,7 @@ def _dense(key, n_in, n_out, scale=1.0):
 def init_params(key, cfg: Config, y):
     k = jax.random.split(key, 5)
     y = jnp.asarray(y, dtype=jnp.float32)
-    return {
+    out = {
         "W": 0.05 * jax.random.normal(k[0], (2 * cfg.J, cfg.N)),
         "b0": jnp.log(y.mean(0) + 1e-2),
         "enc": [_dense(k[1], cfg.N, cfg.hidden),
@@ -92,6 +94,9 @@ def init_params(key, cfg: Config, y):
         "log_kappa": jnp.full((cfg.n_cond,), jnp.log(2.0)),
         "prior": jnp.zeros(2 * cfg.K_prior),
     }
+    if cfg.beh_warp > 0:
+        out["warp"] = jnp.zeros(1 + 2 * cfg.beh_warp)
+    return out
 
 
 def kappas(params, cfg: Config):
@@ -143,9 +148,20 @@ def log_lik_grid(params, cfg: Config, y):
             - gammaln(y + 1.0).sum(-1)[:, None])
 
 
-def log_beh_grid(cfg: Config, b, kappa_t):
-    """log VM(b_t | x_g, kappa_t), shape (T, G)."""
-    d = b[:, None] - grid(cfg)[None, :]
+def beh_mean_at(params, cfg: Config, x):
+    """Mean direction of behavior given latent x. The identity unless a warp is learned:
+    g(x) = x + w0 + sum_k (a_k sin kx + c_k cos kx)."""
+    if cfg.beh_warp == 0:
+        return x
+    w, K = params["warp"], cfg.beh_warp
+    k = jnp.arange(1, K + 1)
+    return x + w[0] + jnp.sin(x[..., None] * k) @ w[1:1 + K] + jnp.cos(x[..., None] * k) @ w[1 + K:]
+
+
+def log_beh_grid(cfg: Config, b, kappa_t, params=None):
+    """log VM(b_t | g(x_g), kappa_t), shape (T, G). Pass params to use a learned warp g."""
+    gx = grid(cfg) if params is None else beh_mean_at(params, cfg, grid(cfg))
+    d = b[:, None] - gx[None, :]
     return (kappa_t[:, None] * jnp.cos(d)
             - jnp.log(2 * jnp.pi) - log_i0(kappa_t)[:, None])
 
@@ -160,7 +176,7 @@ def elbo_per_bin(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     logq = log_q_grid(z, cfg)
     joint = (log_prior_grid(params, cfg)[None, :]
              + log_lik_grid(params, cfg, y)
-             + log_beh_grid(cfg, b, kap))
+             + log_beh_grid(cfg, b, kap, params))
     elbo = (jnp.exp(logq) * (joint - logq)).sum(-1)
     log_marg = jax.scipy.special.logsumexp(joint, axis=-1)
     return elbo, log_marg
@@ -171,6 +187,8 @@ def loss_fn(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     T = y.shape[0]
     pen = 0.5 * jnp.sum((params["W"] / tau(cfg)[:, None]) ** 2)
     pen = pen + 0.5 * jnp.sum(params["prior"] ** 2)
+    if cfg.beh_warp > 0:
+        pen = pen + 0.5 * jnp.sum((params["warp"] / cfg.warp_sd) ** 2)
     return -elbo.mean() + pen / T
 
 
@@ -179,7 +197,7 @@ def heldout_loglik(params, cfg: Config, y, b, cond):
     log p(y_t | b_t), the quantity compared across kappa."""
     kap = kappas(params, cfg)[cond]
     lp = log_prior_grid(params, cfg)[None, :]
-    lb = log_beh_grid(cfg, b, kap)
+    lb = log_beh_grid(cfg, b, kap, params)
     joint = jax.scipy.special.logsumexp(lp + log_lik_grid(params, cfg, y) + lb, axis=-1)
     marg_b = jax.scipy.special.logsumexp(lp + lb, axis=-1)
     return joint, marg_b

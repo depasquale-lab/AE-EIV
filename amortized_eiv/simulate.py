@@ -42,7 +42,7 @@ def _fourier(x, J):
 
 def simulate_shared(seed=0, N=30, T=1000, kappas=(8.0, 3.0, 0.5), tuning="gp",
                     step_sd=0.25, gp_ell=0.12, gp_J=6, bias=2.5, scale=1.0,
-                    vm_kappa=3.0, vm_gain=(3.0, 8.0), vm_base=0.3):
+                    vm_kappa=3.0, vm_gain=(3.0, 8.0), vm_base=0.3, behavior_map=None):
     """One latent trajectory and one set of spikes, several behavior traces.
 
     As in the preprint's Fig 1 and Fig 2, spiking and the latent are identical
@@ -76,10 +76,12 @@ def simulate_shared(seed=0, N=30, T=1000, kappas=(8.0, 3.0, 0.5), tuning="gp",
             return vm_base + gain[None, :] * np.exp(vm_kappa * (np.cos(xx[:, None] - pref[None, :]) - 1.0))
 
     y = rng.poisson(rate(x)).astype(np.float32)
+    b_mean = x if behavior_map is None else behavior_map(x)
     bs = []
     for k in kappas:
         if k > 0:
-            bs.append(np.array([rng.vonmises(xi, k) for xi in x], dtype=np.float32))
+            bs.append(np.array([rng.vonmises(xi, k) for xi in b_mean], dtype=np.float32))
         else:
             bs.append(rng.uniform(-np.pi, np.pi, T).astype(np.float32))
-    return {"y": y, "x": x, "b": bs, "kappas": tuple(kappas), "rate": rate, "ring": ring}
+    return {"y": y, "x": x, "b": bs, "kappas": tuple(kappas), "rate": rate, "ring": ring,
+            "b_mean": np.asarray(b_mean)}
