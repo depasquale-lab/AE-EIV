@@ -1,0 +1,12 @@
+seed 0 nngp_d1 amortized_S4_h256  held-out -134.44 kappa 2.52 latent err 0.418
+seed 0 nngp_d1 qmc_M1024          held-out -132.26 kappa 2.80 latent err 0.374
+seed 0 nngp_d1 grid_G32           held-out -132.77 kappa 2.84 latent err 0.343
+seed 0 nngp_d2 amortized_S4_h256  held-out -119.78 kappa 2.93 latent err 0.113
+seed 0 nngp_d2 qmc_M1024          held-out -118.13 kappa 3.93 latent err 0.043
+seed 0 nngp_d2 grid_G32           held-out -118.30 kappa 3.91 latent err 0.064
+seed 1 nngp_d1 amortized_S4_h256  held-out -129.81 kappa 2.63 latent err 0.321
+seed 1 nngp_d1 qmc_M1024          held-out -128.77 kappa 3.08 latent err 0.310
+seed 1 nngp_d1 grid_G32           held-out -129.71 kappa 3.11 latent err 0.319
+seed 1 nngp_d2 amortized_S4_h256  held-out -117.58 kappa 3.21 latent err 0.136
+seed 1 nngp_d2 qmc_M1024          held-out -115.63 kappa 3.92 latent err 0.047
+seed 1 nngp_d2 grid_G32           held-out -115.75 kappa 3.92 latent err 0.060

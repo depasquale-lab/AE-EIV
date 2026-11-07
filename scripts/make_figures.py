@@ -275,6 +275,97 @@ def fig_torus2d():
     plt.close(fig)
 
 
+# ------------------------------------------------------------------ kernels
+
+KCOL = {"matern": "#222222", "nngp_d1": "#d62728", "nngp_d2": "#e08a1e", "nngp_d3": "#2e9e5b"}
+KLAB = {"matern": "Matern-type (default)", "nngp_d1": "ReLU NNGP, depth 1", "nngp_d2": "ReLU NNGP, depth 2",
+        "nngp_d3": "ReLU NNGP, depth 3"}
+KSPEC = {"matern": ("matern", 1), "nngp_d1": ("nngp", 1), "nngp_d2": ("nngp", 2), "nngp_d3": ("nngp", 3)}
+
+
+def fig_kernels():
+    from amortized_eiv import kernels as K
+    J = 12
+    taus = {n: K.ring_tau(J, kern, depth) for n, (kern, depth) in KSPEC.items()}
+    d = np.linspace(0, np.pi, 300)
+    fig = plt.figure(figsize=(15, 7.2))
+    gs = fig.add_gridspec(2, 4, hspace=0.5, wspace=0.35)
+    ax = fig.add_subplot(gs[0, 0:2])
+    for n, t in taus.items():
+        k = K.ring_kernel_from_tau(t, d)
+        ax.plot(d, k / k[0], color=KCOL[n], lw=2, label=KLAB[n])
+    ax.set_xlabel("angular distance between two stimulus values (rad)"); ax.set_ylabel("prior correlation of log rate")
+    ax.set_title("Kernel implied by each prior", loc="left"); ax.legend(frameon=False, fontsize=8)
+    ax = fig.add_subplot(gs[0, 2:4])
+    js = np.arange(1, J + 1)
+    for n, t in taus.items():
+        ax.semilogy(js, t ** 2, marker="o", ms=4, color=KCOL[n], lw=1.6, label=KLAB[n])
+    ax.set_xlabel("harmonic j"); ax.set_ylabel("prior variance of weight at harmonic j")
+    ax.set_xticks(js); ax.set_title("Spectrum: depth 1 has no odd harmonics above 1", loc="left")
+    rng = np.random.default_rng(3)
+    x = np.linspace(-np.pi, np.pi, 400)
+    B = np.concatenate([np.cos(x[:, None] * js), np.sin(x[:, None] * js)], axis=1)
+    w = rng.standard_normal((2 * J, 4))
+    for c, (n, t) in enumerate(taus.items()):
+        ax = fig.add_subplot(gs[1, c])
+        h = B @ (np.concatenate([t, t])[:, None] * w)
+        for q in range(4):
+            ax.plot(x, np.exp(h[:, q] - h[:, q].max()), lw=1.4)
+        ax.set_title(KLAB[n], loc="left", fontsize=9, color=KCOL[n])
+        ax.set_xlabel("stimulus angle (rad)")
+        ax.set_ylim(0, 1.05)
+        if c == 0: ax.set_ylabel("tuning curve drawn from the prior\n(scaled to peak 1)")
+    fig.savefig(f"{OUT}/kernels.png")
+    plt.close(fig)
+
+
+def fig_kernel_results():
+    kc = json.load(open("results/kernel_comparison.json"))
+    k2 = json.load(open("results/kernel_torus2d.json"))
+    t2 = json.load(open("results/torus2d_results.json"))["runs"]
+    cases = [("smooth", "kappa8", "smooth\nκ = 8"), ("smooth", "kappa3", "smooth\nκ = 3"),
+             ("smooth", "kappa0.5", "smooth\nκ = 0.5"), ("sharp", "kappa3", "sharp bumps\nκ = 3")]
+    names = ["nngp_d1", "nngp_d2", "nngp_d3"]
+    fig, axs = plt.subplots(1, 4, figsize=(18, 4.2), gridspec_kw={"width_ratios": [1.2, 1.0, 1.0, 1.0], "wspace": 0.4})
+    for ax, metric, ttl, ylab in ((axs[0], "heldout", "Held-out score relative to the default prior", "held-out log p(y | b) per bin, difference"),
+                                  (axs[1], "tuning_r", "Tuning-curve recovery", "correlation with true curves"),
+                                  (axs[2], "latent_err", "Latent error", "mean circular error (rad)")):
+        w = 0.2
+        for ci, (grp, key, lab) in enumerate(cases):
+            base = np.array([r[metric] for r in kc[grp][key]["matern"]])
+            if metric == "tuning_r":
+                ax.scatter([ci - 1.5 * w] * len(base), base, color=KCOL["matern"], s=26, marker="x", zorder=3)
+            if metric == "latent_err":
+                ax.scatter([ci - 1.5 * w] * len(base), base, color=KCOL["matern"], s=26, marker="x", zorder=3)
+            for ni, n in enumerate(names):
+                v = np.array([r[metric] for r in kc[grp][key][n]])
+                val = v - base if metric == "heldout" else v
+                ax.bar(ci + (ni - 0.5) * w, val.mean(), w, color=KCOL[n])
+                ax.scatter([ci + (ni - 0.5) * w] * len(val), val, color="#444444", s=10, zorder=3)
+        ax.set_xticks(range(4)); ax.set_xticklabels([c[2] for c in cases], fontsize=8)
+        ax.set_title(ttl, loc="left", fontsize=10); ax.set_ylabel(ylab)
+        if metric == "heldout": ax.axhline(0, color="#222222", lw=1)
+        if metric == "tuning_r": ax.set_ylim(0.6, 1.0)
+        if metric == "latent_err": ax.set_ylim(0, None)
+    ax = axs[3]
+    methods = ["amortized_S4_h256", "qmc_M1024", "grid_G32"]
+    mlab = ["amortized\nS=4", "QMC\n1024", "grid\n32 x 32"]
+    for mi, mname in enumerate(methods):
+        for ni, n in enumerate(["nngp_d1", "nngp_d2"]):
+            diffs = [k2[s][n][mname]["heldout"] - t2[s][mname]["history"][-1]["heldout"] for s in ("0", "1")]
+            ax.bar(mi + (ni - 0.5) * 0.35, np.mean(diffs), 0.35, color=KCOL[n])
+            ax.scatter([mi + (ni - 0.5) * 0.35] * 2, diffs, color="#444444", s=10, zorder=3)
+    ax.axhline(0, color="#222222", lw=1); ax.set_xticks(range(3)); ax.set_xticklabels(mlab, fontsize=8)
+    ax.set_title("2D torus: held-out relative to default prior", loc="left", fontsize=10)
+    ax.set_ylabel("held-out log p(y | b) per bin, difference")
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    handles = [Patch(color=KCOL[n], label=KLAB[n]) for n in names] + [Line2D([], [], color=KCOL["matern"], marker="x", ls="", label="default prior, per seed (panels 2 and 3)"), Line2D([], [], color="#444444", marker="o", ms=4, ls="", label="each seed (bars are means)")]
+    fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, fontsize=8, bbox_to_anchor=(0.5, -0.08))
+    fig.savefig(f"{OUT}/kernel_results.png")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     which = sys.argv[1:] or ["model", "gate", "smoke", "noisy", "speed", "torus"]
     if "model" in which: fig_model()
@@ -283,3 +374,5 @@ if __name__ == "__main__":
     if "noisy" in which: fig_noisy()
     if "speed" in which: fig_speed1d()
     if "torus" in which: fig_torus2d()
+    if "kernels" in which: fig_kernels()
+    if "kernelresults" in which: fig_kernel_results()

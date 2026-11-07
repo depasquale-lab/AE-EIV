@@ -53,6 +53,8 @@ I1(kappa) / I0(kappa) = mean over t of  rho_t cos(b_t - mu_t),     rho_t e^{i mu
 
 The right side is small when the posterior is broad or displaced from behavior. Then κ goes to 0, p(x | b) goes to the prior, and behavior has no gradient on x. Training randomly zeroes the encoder gate in a fraction of bins. The generative model is unchanged, so the ELBO stays a valid bound.
 
+The tuning-curve weights have a Gaussian prior whose spectrum sets the smoothness of the curves, which is the weight-space form of a Gaussian process. The default is Matérn-type. An infinitely wide ReLU network kernel is available as an option and is compared below.
+
 On the ring the latent lives on a grid of 128 points, so the ELBO is an exact sum. On the 2D torus the posterior is Gaussian and the ELBO uses reparameterized samples.
 
 ## Results so far
@@ -63,6 +65,7 @@ On the ring the latent lives on a grid of 128 points, so the ELBO is an exact su
 - When behavior is nearly noise, the fit reproduces the neural mean rates and covariance.
 - In one dimension the amortized model is not faster, except that learning κ in one fit is about 6 times cheaper than a grid over κ with folds. Baselines can learn κ too.
 - In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ.
+- Replacing the Matérn-type tuning prior with an infinitely wide ReLU network kernel (NNGP) brings no gain over a smoother Matérn prior. Depth 1 fails when tuning curves have energy at odd harmonics above 1.
 
 ### Recovery on simulated ring data
 
@@ -163,6 +166,64 @@ Raw behavior has a mean error of 0.43 rad on the held-out bins. Latent error is 
 - Learned κ is biased low, 2.9 to 3.4 against a true 4, while all four integrator baselines recover 3.9 to 3.95. The encoder's own latent error (0.18 to 0.31 rad) is far above the exact posterior's (0.04 to 0.07). This is the amortization gap, and it pulls κ down as the derivation above predicts.
 - 1024 points are already enough in 2D (a 32 × 32 grid is within 0.2 nats of 64 × 64), so integration is not the bottleneck yet. The expected crossover is at higher dimension, where a 3D latent needs about 32 times the points at the same resolution. That case is untested.
 
+### Swapping the tuning prior: an infinitely wide decoder
+
+The decoder's prior on the tuning-curve weights is the weight-space form of a Gaussian process over the log tuning curve. The default has a Matérn-type spectrum, with prior standard deviation 2 (1 + (j / 3)²)⁻¹ at harmonic j. This section replaces it with the kernel of an infinitely wide ReLU network, the neural network Gaussian process (NNGP) kernel, to test whether a prior derived from an architecture helps. It is selected with `Config(kernel="nngp", depth=L)` on the ring and `train(..., kernel="nngp", depth=L)` on the torus.
+
+The inputs are (cos x, sin x) on the ring and (cos x₁, sin x₁, cos x₂, sin x₂) / √2 on the torus. At depth 1 the kernel is the arc-cosine kernel, k(d) = (sin d + (π − d) cos d) / π, and deeper kernels follow from the standard recursion. The Fourier coefficients of the kernel give the prior variance of each harmonic. The spectrum is rescaled to the same total variance as the default, so the priors differ in shape and not in scale. This is the NNGP and not the neural tangent kernel. The latent x is learned, so the decoder's inputs move during training and the tangent kernel's fixed-feature regime does not apply.
+
+![Kernels](figures/kernels.png)
+
+*Top left: prior correlation of the log rate between two stimulus values. The NNGP kernels are broader and strongly anticorrelated at the antipode. Top right: prior variance by harmonic. Depth 1 puts no variance on odd harmonics from 3 upward, a known property of ReLU kernels that I confirmed numerically. Bottom: tuning curves drawn from each prior, scaled to peak 1.*
+
+Setup (`scripts/kernel_comparison.py`, `scripts/kernel_torus2d.py`, about 15 minutes in total). On the ring, N = 30 and T = 1000, with 80% of the bins for training and 20% for scoring, kappa learned for 3000 steps, and 2 seeds. The smooth data are drawn from a periodic squared-exponential GP (the Fig 2 setup) with kappa = 8, 3, and 0.5. The sharp data are von Mises bumps with concentration 6 and kappa = 3. On the torus, the data, folds, and budgets are those of the 2D benchmark, for three of its methods. Entries are means over the two seeds.
+
+![Kernel results](figures/kernel_results.png)
+
+*Left to right: held-out score relative to the default prior, tuning-curve correlation with the true curves, latent error, and held-out score on the 2D torus. Bars are means over two seeds, dots are single seeds, and crosses are the default prior.*
+
+| Data, true κ | Prior | κ learned | Held-out log p(y given b) | Tuning-curve r | Latent error (rad) |
+| --- | --- | --- | --- | --- | --- |
+| smooth tuning, 8.0 | Matérn-type (default) | 8.01 | −56.563 | 0.995 | 0.053 |
+| smooth tuning, 8.0 | ReLU NNGP, depth 1 | 6.00 | −57.532 | 0.869 | 0.182 |
+| smooth tuning, 8.0 | ReLU NNGP, depth 2 | 7.98 | −56.485 | 0.995 | 0.052 |
+| smooth tuning, 8.0 | ReLU NNGP, depth 3 | 7.99 | −56.510 | 0.995 | 0.052 |
+| smooth tuning, 3.0 | Matérn-type (default) | 2.95 | −57.187 | 0.993 | 0.060 |
+| smooth tuning, 3.0 | ReLU NNGP, depth 1 | 2.62 | −57.872 | 0.811 | 0.230 |
+| smooth tuning, 3.0 | ReLU NNGP, depth 2 | 2.95 | −57.110 | 0.994 | 0.059 |
+| smooth tuning, 3.0 | ReLU NNGP, depth 3 | 2.95 | −57.134 | 0.993 | 0.060 |
+| smooth tuning, 0.5 | Matérn-type (default) | 0.42 | −57.968 | 0.845 | 0.292 |
+| smooth tuning, 0.5 | ReLU NNGP, depth 1 | 0.40 | −58.465 | 0.673 | 0.399 |
+| smooth tuning, 0.5 | ReLU NNGP, depth 2 | 0.42 | −57.898 | 0.833 | 0.308 |
+| smooth tuning, 0.5 | ReLU NNGP, depth 3 | 0.42 | −57.916 | 0.839 | 0.302 |
+| sharp bumps, 3.0 | Matérn-type (default) | 3.10 | −34.823 | 0.989 | 0.086 |
+| sharp bumps, 3.0 | ReLU NNGP, depth 1 | 3.07 | −34.836 | 0.986 | 0.091 |
+| sharp bumps, 3.0 | ReLU NNGP, depth 2 | 3.10 | −34.702 | 0.994 | 0.080 |
+| sharp bumps, 3.0 | ReLU NNGP, depth 3 | 3.10 | −34.728 | 0.993 | 0.081 |
+
+2D torus, held-out log p(y given b) with seed 0 / seed 1, and the learned kappa (true 4):
+
+| Method | Default prior | NNGP, depth 1 | NNGP, depth 2 |
+| --- | --- | --- | --- |
+| Amortized, S = 4, width 256 | −118.96 / −116.41; κ 3.09 / 3.36 | −134.44 / −129.81; κ 2.52 / 2.63 | −119.78 / −117.58; κ 2.93 / 3.21 |
+| QMC, M = 1024 | −118.14 / −115.65; κ 3.93 / 3.92 | −132.26 / −128.77; κ 2.80 / 3.08 | −118.13 / −115.63; κ 3.93 / 3.92 |
+| Exact grid, 32 × 32 | −118.33 / −115.77; κ 3.91 / 3.92 | −132.77 / −129.71; κ 2.84 / 3.11 | −118.30 / −115.75; κ 3.91 / 3.92 |
+
+- Depth 1 fails when the log tuning curve has energy at odd harmonics from 3 upward. On the smooth ring data its held-out score is 0.5 to 1.0 nats per bin worse than the default, its tuning-curve correlation is 0.67 to 0.87 against 0.85 to 0.995, and its learned kappa is 6.0 against a true 8. On the torus it is 13 to 15 nats per bin worse for every method. On sharp von Mises bumps it ties the default (held-out −34.84 against −34.82), probably because the log of a bump is close to a single sinusoid.
+- Depths 2 and 3 are slightly better than the default on held-out score in all 8 paired ring comparisons, by 0.04 to 0.15 nats per bin. Tuning-curve recovery and latent error are about equal, and the latent error at kappa = 0.5 is slightly worse (0.31 and 0.30 against 0.29).
+- On the torus, depth 2 equals the default for the exact integrators (within 0.03 nats per bin). For the amortized model it is 0.8 to 1.2 nats worse, and its latent error roughly doubles (0.11 to 0.14 against 0.06 to 0.07).
+- The ring gains are not specific to the NNGP. A control with variance-matched Matérn priors whose spectrum decays faster gives gains that bracket the NNGP gains, smaller for ν = 2 and larger for ν = 3. Depths 2 and 3 therefore behave like a smoother prior than the untuned default. Held-out difference from the default, mean over two seeds:
+
+| Prior | Smooth tuning, κ = 3 | Sharp bumps, κ = 3 |
+| --- | --- | --- |
+| Matérn-type, default (ℓ = 3, ν = 2) | 0 (reference) | 0 (reference) |
+| Matérn-type, ℓ = 1.5, ν = 2 | +0.033  (seeds +0.041, +0.024) | +0.069  (seeds +0.079, +0.060) |
+| Matérn-type, ℓ = 1.5, ν = 3 | +0.121  (seeds +0.137, +0.104) | +0.155  (seeds +0.191, +0.118) |
+| ReLU NNGP, depth 2 | +0.077  (seeds +0.091, +0.064) | +0.122  (seeds +0.146, +0.097) |
+| ReLU NNGP, depth 3 | +0.053  (seeds +0.064, +0.042) | +0.095  (seeds +0.112, +0.079) |
+
+In this test an architecture-derived prior brought no advantage over tuning the smoothness of the Matérn prior. Choosing the smoothness by cross-validation, as the preprint does for its kernel hyperparameters, is the better comparison and is untested.
+
 ## Known limitations
 
 - κ is biased low when neural information is weak. With N = 8 the cleanest condition gives 3.7 against a true 8, and a 9000-step run stays near 3.8, so this is not slow convergence. The cause is not isolated. A broad posterior pulls the κ update down, which fits the mechanism above, but this is a hypothesis.
@@ -172,6 +233,7 @@ Raw behavior has a mean error of 0.43 rad on the held-out bins. Latent error is 
 - Simulated data only. Fig 2 and the 2D benchmark draw tuning curves from the decoder's own Fourier family, which favors the model. The smoke tests and Fig 1 use von Mises bump tuning.
 - Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparisons use stand-in baselines, and an L-BFGS baseline was tried. The preprint's own implementation was not.
 - The speed results are from one dataset, one fold, and a one-dimensional latent. In the 2D torus the amortized model was cheaper per step but did not match the integrators' fit quality or recover κ. Latents of three or more dimensions are untested.
+- The kernel comparison uses two seeds and simulated data. The default Matérn hyperparameters were not tuned, and only a ReLU network without bias was tried, with depth as the only architecture choice. Real tuning curves were not tested.
 - One κ per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The ring latent is a grid of 128 points, a fixed approximation.
 
 ## Reproduce
@@ -186,6 +248,9 @@ python scripts/benchmark_speed.py       # ring speed benchmark
 python scripts/convergence_diagnostics.py
 python scripts/lbfgs_baseline.py
 python scripts/benchmark_torus2d.py     # 2D torus benchmark, about 11 minutes
+python scripts/kernel_comparison.py     # ring tuning-prior comparison, about 10 minutes
+python scripts/kernel_comparison.py --control   # Matérn smoothness control, about 3 minutes
+python scripts/kernel_torus2d.py        # torus tuning-prior comparison, about 5 minutes
 python scripts/make_figures.py          # rebuild figures/ from the saved results
 ```
 
@@ -202,7 +267,8 @@ mu0, rho0, _ = ae.posterior(params, cfg, feat, d["b"], d["cond"], use_behavior=F
 | `amortized_eiv/model.py` | Ring model, ELBO, encoder with gate |
 | `amortized_eiv/torus2d.py` | 2D torus model and the three fitting methods |
 | `amortized_eiv/baseline.py` | Quasi-Monte Carlo and exact-grid baselines |
+| `amortized_eiv/kernels.py` | Tuning priors: Matérn-type and ReLU NNGP spectra |
 | `amortized_eiv/experiments.py`, `simulate.py` | Experiments and simulators |
-| `tests/` | Derivation checks, smoke tests, simulator tests, 2D tests |
+| `tests/` | Derivation checks, smoke tests, simulator tests, 2D tests, kernel tests |
 | `results/` | Saved results, logs, and the Fig 1 and Fig 2 reproductions |
 | `figures/` | Figures used in this README |

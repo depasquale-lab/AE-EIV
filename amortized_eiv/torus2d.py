@@ -21,6 +21,7 @@ import numpy as np
 import optax
 from jax.scipy.special import gammaln, logsumexp
 
+from . import kernels as _kernels
 from .model import log_i0
 
 _PLASTIC = 1.32471795724475
@@ -41,9 +42,8 @@ def basis(x, F):
     return jnp.concatenate([jnp.cos(ang), jnp.sin(ang)], axis=-1)
 
 
-def tau(F, tau0=2.0, ell=3.0, nu=2.0):
-    r2 = (F ** 2).sum(1)
-    t = tau0 * (1.0 + r2 / ell ** 2) ** (-nu / 2.0)
+def tau(F, tau0=2.0, ell=3.0, nu=2.0, kernel="matern", depth=1):
+    t = jnp.asarray(_kernels.torus_tau(np.asarray(F), kernel, depth, tau0, ell, nu), dtype=jnp.float32)
     return jnp.concatenate([t, t])
 
 
@@ -82,8 +82,9 @@ def _lb_points(kap, b, xs):
     return kap * c - 2 * log_i0(kap) - 2 * LOG2PI
 
 
-def _pen(p, F, T):
-    return 0.5 * jnp.sum((p["W"] / tau(F)[:, None]) ** 2) / T
+def _pen(p, F, T, tv=None):
+    tv = tau(F) if tv is None else tv
+    return 0.5 * jnp.sum((p["W"] / tv[:, None]) ** 2) / T
 
 
 def qmc_points(key, M):
@@ -98,12 +99,12 @@ def grid_points(G):
     return jnp.stack([a.ravel(), b.ravel()], axis=-1)
 
 
-def loss_points(p, F, y, b, xs, T):
+def loss_points(p, F, y, b, xs, T, tv=None):
     lg = _ll_points(p, F, y, xs) + _lb_points(_kap(p), b, xs)
-    return -(logsumexp(lg, axis=1) - jnp.log(xs.shape[0])).mean() + _pen(p, F, T)
+    return -(logsumexp(lg, axis=1) - jnp.log(xs.shape[0])).mean() + _pen(p, F, T, tv)
 
 
-def loss_amortized(p, F, key, feat, y, b, T, S=2):
+def loss_amortized(p, F, key, feat, y, b, T, S=2, tv=None):
     kap = _kap(p)
     inp = jnp.concatenate([feat, kap * jnp.cos(b), kap * jnp.sin(b)], axis=-1)
     out = _mlp(p["enc"], inp)
@@ -113,10 +114,10 @@ def loss_amortized(p, F, key, feat, y, b, T, S=2):
     ll = (y[None] * logF - jnp.exp(logF)).sum(-1).mean(0)
     lb = kap * (jnp.exp(-0.5 * sig ** 2) * jnp.cos(b - mu)).sum(-1) - 2 * log_i0(kap) - 2 * LOG2PI
     ent = (0.5 * jnp.log(2 * jnp.pi * jnp.e * sig ** 2)).sum(-1)
-    return -(ll + lb - 2 * LOG2PI + ent).mean() + _pen(p, F, T)
+    return -(ll + lb - 2 * LOG2PI + ent).mean() + _pen(p, F, T, tv)
 
 
-def supervised_init(p, F, y, b, steps=800, lr=1e-2):
+def supervised_init(p, F, y, b, steps=800, lr=1e-2, tv=None):
     """Poisson regression of y on the Fourier basis of behavior (kappa -> infinity).
     Initializes the decoder for every method, following the preprint's use of
     supervised tuning curves as a starting point."""
@@ -126,7 +127,7 @@ def supervised_init(p, F, y, b, steps=800, lr=1e-2):
 
     def loss(q):
         logF = q["b0"][None, :] + basis(b, F) @ q["W"]
-        return -(y * logF - jnp.exp(logF)).sum(-1).mean() + _pen(q, F, T)
+        return -(y * logF - jnp.exp(logF)).sum(-1).mean() + _pen(q, F, T, tv)
 
     opt = optax.adam(lr)
     st = opt.init(q)
@@ -188,7 +189,8 @@ def simulate_torus(seed=0, N=60, T=2000, kappa=4.0, K=3, ell=0.12, step_sd=0.35,
 # --------------------------------------------------------------------- training
 
 def train(method, y, b, y_te, b_te, x_te, F, *, steps, checkpoints, batch=512, lr=5e-3,
-          seed=0, S=2, M=4096, G=64, verbose=True, sup_init=True, hidden=128):
+          seed=0, S=2, M=4096, G=64, verbose=True, sup_init=True, hidden=128,
+          kernel="matern", depth=1):
     """method in {'amortized', 'qmc', 'grid'}. Returns history with training time that
     excludes compilation and evaluation."""
     y, b = jnp.asarray(y), jnp.asarray(b)
@@ -198,8 +200,9 @@ def train(method, y, b, y_te, b_te, x_te, F, *, steps, checkpoints, batch=512, l
     key = jax.random.PRNGKey(seed)
     key, k0 = jax.random.split(key)
     p = init(k0, y.shape[1], y, F, hidden=hidden, amortized=(method == "amortized"))
+    tv = tau(F, kernel=kernel, depth=depth)
     if sup_init:
-        p = supervised_init(p, F, y, b)
+        p = supervised_init(p, F, y, b, tv=tv)
     opt = optax.chain(optax.clip_by_global_norm(10.0), optax.adam(lr))
     state = opt.init(p)
     pts = grid_points(G) if method == "grid" else None
@@ -207,9 +210,9 @@ def train(method, y, b, y_te, b_te, x_te, F, *, steps, checkpoints, batch=512, l
     def loss(p, key, idx):
         yb, bb = y[idx], b[idx]
         if method == "amortized":
-            return loss_amortized(p, F, key, feat[idx], yb, bb, T, S)
+            return loss_amortized(p, F, key, feat[idx], yb, bb, T, S, tv)
         xs = pts if method == "grid" else qmc_points(key, M)
-        return loss_points(p, F, yb, bb, xs, T)
+        return loss_points(p, F, yb, bb, xs, T, tv)
 
     @jax.jit
     def step(p, state, key):

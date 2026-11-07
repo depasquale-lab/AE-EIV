@@ -25,6 +25,8 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import gammaln, i0e
 
+from . import kernels as _kernels
+
 
 @dataclass(frozen=True)
 class Config:
@@ -40,6 +42,8 @@ class Config:
     kappa_min: float = 1e-3
     kappa_max: float = 500.0
     learn_prior: bool = True
+    kernel: str = "matern"      # prior on tuning-curve weights: "matern" or "nngp"
+    depth: int = 1              # ReLU network depth for kernel = "nngp"
 
 
 def log_i0(k):
@@ -57,8 +61,8 @@ def fourier_basis(x, J):
 
 
 def tau(cfg: Config):
-    j = jnp.arange(1, cfg.J + 1)
-    t = cfg.tau0 * (1.0 + (j / cfg.ell) ** 2) ** (-cfg.nu / 2.0)
+    t = jnp.asarray(_kernels.ring_tau(cfg.J, cfg.kernel, cfg.depth, cfg.tau0, cfg.ell, cfg.nu),
+                    dtype=jnp.float32)
     return jnp.concatenate([t, t])
 
 

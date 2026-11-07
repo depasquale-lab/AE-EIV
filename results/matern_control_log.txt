@@ -1,0 +1,12 @@
+smooth_kappa3 0 matern_default {'kappa': 2.898, 'heldout': -57.099, 'latent_err': 0.063, 'tuning_r': 0.992}
+smooth_kappa3 0 matern_l1.5_nu2 {'kappa': 2.896, 'heldout': -57.058, 'latent_err': 0.064, 'tuning_r': 0.993}
+smooth_kappa3 0 matern_l1.5_nu3 {'kappa': 2.895, 'heldout': -56.962, 'latent_err': 0.062, 'tuning_r': 0.994}
+sharp_kappa3 0 matern_default {'kappa': 3.057, 'heldout': -35.335, 'latent_err': 0.082, 'tuning_r': 0.989}
+sharp_kappa3 0 matern_l1.5_nu2 {'kappa': 3.061, 'heldout': -35.256, 'latent_err': 0.078, 'tuning_r': 0.992}
+sharp_kappa3 0 matern_l1.5_nu3 {'kappa': 3.065, 'heldout': -35.144, 'latent_err': 0.075, 'tuning_r': 0.996}
+smooth_kappa3 1 matern_default {'kappa': 3.007, 'heldout': -57.275, 'latent_err': 0.056, 'tuning_r': 0.993}
+smooth_kappa3 1 matern_l1.5_nu2 {'kappa': 3.007, 'heldout': -57.251, 'latent_err': 0.056, 'tuning_r': 0.993}
+smooth_kappa3 1 matern_l1.5_nu3 {'kappa': 3.005, 'heldout': -57.171, 'latent_err': 0.056, 'tuning_r': 0.995}
+sharp_kappa3 1 matern_default {'kappa': 3.136, 'heldout': -34.311, 'latent_err': 0.089, 'tuning_r': 0.99}
+sharp_kappa3 1 matern_l1.5_nu2 {'kappa': 3.132, 'heldout': -34.251, 'latent_err': 0.086, 'tuning_r': 0.992}
+sharp_kappa3 1 matern_l1.5_nu3 {'kappa': 3.131, 'heldout': -34.193, 'latent_err': 0.08, 'tuning_r': 0.995}
