@@ -68,6 +68,10 @@ On the ring the latent lives on a grid of 128 points, so the ELBO is an exact su
 - A neural-only encoder with a separate behavior decoder (no behavior input) matches the gated encoder with strong neural information and loses with weak information. A learned behavior decoder helps when behavior is offset from the latent.
 - Replacing the Matérn-type tuning prior with an infinitely wide ReLU network kernel (NNGP) brings no gain over a smoother Matérn prior. Depth 1 fails when tuning curves have energy at odd harmonics above 1.
 
+![Scorecard against a preprint-style baseline](figures/scorecard.png)
+
+*The baseline is a stand-in written for these tests (same decoder, quasi-Monte Carlo or exact-grid integration of the latent), not the preprint's code. Top left: learned κ divided by the true value. Top right: held-out score of the amortized model minus the best integrator baseline. Bottom left: wall time to choose κ on the ring, with the preprint's grid protocol (9 values, 2 folds) extrapolated from one fit. Bottom right: cost per optimizer step. The 1024-point quasi-Monte Carlo step measured 3.8 ms in an earlier run, so timings vary by run.*
+
 ### Recovery on simulated ring data
 
 ![Smoke test results](figures/smoke_results.png)
@@ -229,6 +233,10 @@ In this test an architecture-derived prior brought no advantage over tuning the 
 
 The gated encoder ties the behavior input to the behavior decoder through a single κ. An alternative keeps two encoders and two decoders and drops the behavior encoder entirely. The encoder q(x | y) sees only neural activity. Behavior enters only through its decoder p(b | x), which is a von Mises density around the latent with concentration κ, or equivalently through the conditional prior p(x | b). When behavior is noisy, κ goes to 0 and the behavior term is flat. The model is then a neural encoder and decoder with a learned prior. When behavior is clean, the behavior decoder pulls the latent toward behavior, so behavior can be decoded from neural activity alone. In the code this is `fit(..., p_drop=1.0)`, which sets the gate to zero in every bin. The generative model is unchanged.
 
+![Architecture variants](figures/architecture_variants.png)
+
+*Left: the gated encoder, where one κ sets both the behavior encoder's weight and the behavior decoder's precision. Right: the neural-encoder-only variant, where the behavior encoder is absent and behavior enters through its decoder. In both, setting κ to 0 leaves the neural encoder and decoder in place.*
+
 A further option learns the behavior decoder. With `Config(beh_warp=3)` the mean direction of behavior is g(x) = x + w₀ + Σ (aₖ sin kx + cₖ cos kx), where the weights start at 0 so g starts as the identity. The gate cannot do this, because its behavior input assumes that behavior is centered on the latent.
 
 ![Neural encoder only](figures/neural_encoder_variant.png)
@@ -266,6 +274,22 @@ Setup (`scripts/neural_encoder_variant.py`, about 12 minutes). Ring data with 80
 
 The neural-encoder-only formulation matches the gated encoder when neural information is strong and loses when it is weak. It is the more general of the two, because its behavior decoder is separate and can be learned.
 
+## Design notes
+
+How κ is chosen. κ is learned by gradient, one value per condition, starting at 2 and clipped to 0.001 to 500, on the negative ELBO together with the decoder and encoder. At the optimum, I₁(κ) / I₀(κ) equals the mean of ρ cos(b − μ). The preprint fixes κ on a grid and picks the value with the best held-out likelihood. Here the grid appears only as a check in the Fig 2 reproduction (9 values, 2 folds). The Fourier cutoff is fixed at 12 harmonics on the ring and K = 3 on the torus (24 frequencies). It is not chosen from data, and its sensitivity was not tested.
+
+What the approach enables. Learning κ by gradient does not need the encoder. Baselines with the same decoder and a learned κ recover it as well or better (6 to 22 s on the ring), and the preprint's likelihood is also differentiable in κ, so this is a change of protocol. What the encoder adds is behavior-free decoding in one forward pass, and a natural place for a time-varying κ, which is not implemented.
+
+Why behavior gates the encoder input. Given the latent, the behavior term is a von Mises density, exp(κ cos(b − x)), with complex parameter κ e^{ib}. Von Mises densities multiply by adding their complex parameters, so the exact posterior is z = z_ψ(y) + κ e^{ib}, and the gate is κ itself with no extra trust parameters. This is exact on the ring if z_ψ is read as an amortized likelihood and the prior is flat. On the torus the encoder is a Gaussian network with behavior scaled by κ as an input, which is not exact. The gate has not been compared with concatenating b into the network.
+
+Two formulations. In the gated encoder one κ sets both the behavior encoder's weight and the behavior decoder's precision. In the neural-encoder-only version the behavior encoder is absent and behavior enters through its decoder. With κ = 0, both keep the neural encoder, the neural decoder, and the behavior decoder, and the behavior decoder becomes flat. With strong neural information they perform alike. With weak neural information the gate is better, and with a systematic offset between latent and behavior the learned behavior decoder is better.
+
+The prior when behavior is noisy. The conditional prior is p(x | b) ∝ p_φ(x) VM(b | x, κ). As κ goes to 0 it becomes p_φ(x), which is fit to the latents that the neural data occupy. The model is then a neural VAE with a learned prior, and samples from it match the data's mean rates and covariance. A network that learns p(x | b) directly, as in the original sketch, is not implemented. The learned behavior decoder is the closest analogue.
+
+The tuning prior. The decoder's weight prior is the weight-space form of a Gaussian process with a Matérn-type spectrum. An infinitely wide ReLU network kernel (NNGP) is available as an option and gave no advantage over a smoother Matérn prior. This is the NNGP and not the neural tangent kernel, because the latent is learned and the tangent kernel's fixed-feature regime does not apply.
+
+Against the preprint's approach. On the ring, learning κ in one fit is about 6 times cheaper than a grid with folds, and the fit is as good or slightly better on one fold. That saving is available to any baseline that learns κ. In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ, and the integrator baselines are still cheap enough at 1024 points. The case where amortization should win, a latent of three or more dimensions, is untested.
+
 ## Known limitations
 
 - κ is biased low when neural information is weak. With N = 8 the cleanest condition gives 3.7 against a true 8, and a 9000-step run stays near 3.8, so this is not slow convergence. The cause is not isolated. A broad posterior pulls the κ update down, which fits the mechanism above, but this is a hypothesis.
@@ -278,6 +302,16 @@ The neural-encoder-only formulation matches the gated encoder when neural inform
 - The kernel comparison uses two seeds and simulated data. The default Matérn hyperparameters were not tuned, and only a ReLU network without bias was tried, with depth as the only architecture choice. Real tuning curves were not tested.
 - The neural-encoder-only comparison uses two seeds and simulated data. The learned behavior decoder has 3 harmonics, and the offset it recovers was built into the simulation.
 - One κ per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The ring latent is a grid of 128 points, a fixed approximation.
+
+## Next steps
+
+- Test a latent of three or more dimensions, where grid and quasi-Monte Carlo cost grows with the number of points and amortization should help.
+- Learn a conditional prior p(x | b) with a network and compare it with the learned warp.
+- Add a time-varying κ and test whether it tracks transitions in the simulated data.
+- Choose the Matérn smoothness by cross-validation and compare that with the NNGP prior.
+- Compare the gate with concatenating b into the encoder network.
+- Run on the ADn and grid-cell recordings, and compare with the authors' code if it is released.
+- Repeat the held-out comparisons over more seeds and folds.
 
 ## Reproduce
 

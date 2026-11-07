@@ -21,10 +21,10 @@ plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.rig
 
 # ------------------------------------------------------------------ schematic
 
-def box(ax, xy, w, h, text, fc="#eef3fa", ec="#1f5fa8", fs=10, lw=1.4):
+def box(ax, xy, w, h, text, fc="#eef3fa", ec="#1f5fa8", fs=10, lw=1.4, ls="-", tc="black"):
     ax.add_patch(FancyBboxPatch(xy, w, h, boxstyle="round,pad=0.02,rounding_size=0.12",
-                                fc=fc, ec=ec, lw=lw))
-    ax.text(xy[0] + w / 2, xy[1] + h / 2, text, ha="center", va="center", fontsize=fs)
+                                fc=fc, ec=ec, lw=lw, ls=ls))
+    ax.text(xy[0] + w / 2, xy[1] + h / 2, text, ha="center", va="center", fontsize=fs, color=tc)
 
 
 def node(ax, xy, r, text, fc="white", ec="#222222", fs=11):
@@ -420,6 +420,114 @@ def fig_variant():
     plt.close(fig)
 
 
+# ------------------------------------------------------- architecture variants
+
+def fig_architecture():
+    ENC, DEC, BEH = ("#eef3fa", "#1f5fa8"), ("#eaf6ee", "#2e9e5b"), ("#fdf1df", "#e08a1e")
+    fig, axs = plt.subplots(1, 2, figsize=(16, 5.6))
+    for ax in axs:
+        ax.set_xlim(0, 12.4); ax.set_ylim(0, 7.6); ax.axis("off")
+    # ---- tied gate
+    ax = axs[0]
+    ax.set_title("Gated encoder: one κ ties the behavior input to the behavior decoder", loc="left", fontweight="bold", fontsize=10.5)
+    node(ax, (0.6, 5.3), 0.5, "y", fc="#e9e9e9"); node(ax, (0.6, 2.2), 0.5, "b", fc="#e9e9e9")
+    box(ax, (1.5, 4.8), 2.4, 1.0, "neural encoder\nz$_ψ$(y)", fc=ENC[0], ec=ENC[1], fs=9)
+    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\nκ e$^{ib}$", fc=BEH[0], ec=BEH[1], fs=9)
+    arrow(ax, (1.1, 5.3), (1.5, 5.3)); arrow(ax, (1.1, 2.2), (1.5, 2.2))
+    node(ax, (4.8, 3.75), 0.4, "+", fs=13)
+    arrow(ax, (3.9, 5.3), (4.6, 4.05)); arrow(ax, (3.9, 2.2), (4.6, 3.45))
+    node(ax, (6.3, 3.75), 0.5, "x")
+    arrow(ax, (5.2, 3.75), (5.8, 3.75), "q(x|y,b)", off=(0, 0.45), fs=8)
+    box(ax, (7.6, 4.8), 2.5, 1.0, "neural decoder\np(y|x)", fc=DEC[0], ec=DEC[1], fs=9)
+    box(ax, (7.6, 1.7), 2.5, 1.0, "behavior decoder\nVM(b | x, κ)", fc=DEC[0], ec=DEC[1], fs=9)
+    arrow(ax, (6.7, 4.0), (7.6, 5.1)); arrow(ax, (6.7, 3.5), (7.6, 2.4))
+    node(ax, (11.2, 5.3), 0.5, "ŷ", fc="#e9e9e9"); node(ax, (11.2, 2.2), 0.5, "b̂", fc="#e9e9e9")
+    arrow(ax, (10.1, 5.3), (10.7, 5.3)); arrow(ax, (10.1, 2.2), (10.7, 2.2))
+    ax.text(6.2, 0.95, "κ → 0: the behavior encoder's weight goes to 0. The neural encoder, neural decoder,\nand behavior decoder remain, and the behavior decoder becomes flat.",
+            ha="center", va="top", fontsize=9)
+    # ---- neural encoder only
+    ax = axs[1]
+    ax.set_title("Neural encoder only: behavior enters through its decoder", loc="left", fontweight="bold", fontsize=10.5)
+    node(ax, (0.6, 5.3), 0.5, "y", fc="#e9e9e9")
+    box(ax, (1.5, 4.8), 2.4, 1.0, "neural encoder\nq(x | y)", fc=ENC[0], ec=ENC[1], fs=9)
+    arrow(ax, (1.1, 5.3), (1.5, 5.3))
+    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\n(dropped: gate off\nin every bin)", fc="white", ec="#aaaaaa", fs=8, ls="--", tc="#999999")
+    node(ax, (6.3, 3.75), 0.5, "x")
+    arrow(ax, (3.9, 5.3), (5.85, 4.0))
+    box(ax, (7.6, 4.8), 2.5, 1.0, "neural decoder\np(y|x)", fc=DEC[0], ec=DEC[1], fs=9)
+    box(ax, (7.6, 1.7), 2.5, 1.0, "behavior decoder\nVM(b | g(x), κ)", fc=DEC[0], ec=DEC[1], fs=9)
+    arrow(ax, (6.7, 4.0), (7.6, 5.1)); arrow(ax, (6.7, 3.5), (7.6, 2.4))
+    node(ax, (11.2, 5.3), 0.5, "ŷ", fc="#e9e9e9"); node(ax, (11.2, 2.2), 0.5, "b", fc="#e9e9e9")
+    arrow(ax, (10.1, 5.3), (10.7, 5.3)); arrow(ax, (10.1, 2.2), (10.7, 2.2))
+    ax.text(10.9, 3.35, "target", fontsize=8, color="#555555", ha="center")
+    ax.text(8.85, 1.15, "g(x) = x by default,\nor a learned warp", fontsize=8, color="#555555", ha="center", va="top")
+    ax.text(6.2, 0.35, "κ → 0: the behavior term is flat, leaving a neural encoder and decoder with a learned prior.\nκ large: the behavior decoder pulls x toward b, so b can be decoded from y alone.",
+            ha="center", va="top", fontsize=9)
+    fig.savefig(f"{OUT}/architecture_variants.png")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------- scorecard
+
+def fig_scorecard():
+    sp = json.load(open("results/speed_results.json"))
+    cv = json.load(open("results/convergence_results.json"))
+    t2 = json.load(open("results/torus2d_results.json"))["runs"]
+    fam = {"amort": C["amort"], "amort2": C["amort2"], "qmc": C["qmc"], "grid": C["grid"]}
+    fit = sp["fits"]
+    ring_k = [("amort.", fit["amortized_free_kappa_3000"]["kappa"] / 3.0, "amort"),
+              ("exact grid", fit["exact_grid_free_kappa_learned_prior_3000"]["kappa"] / 3.0, "grid"),
+              ("QMC 1024", fit["qmc_M1024_free_kappa_3000"]["kappa"] / 3.0, "qmc"),
+              ("QMC 128", fit["qmc_M128_free_kappa_3000"]["kappa"] / 3.0, "qmc")]
+    names2 = [("amortized_S2_h128", "amort\nS=2", "amort2"), ("amortized_S4_h256", "amort\nS=4", "amort"),
+              ("qmc_M1024", "QMC\n1024", "qmc"), ("qmc_M4096", "QMC\n4096", "qmc"),
+              ("grid_G32", "grid\n32", "grid"), ("grid_G64", "grid\n64", "grid")]
+    k2 = {k: np.mean([t2[s][k]["history"][-1]["kappa"] for s in t2]) / 4.0 for k, *_ in names2}
+    fig, axs = plt.subplots(2, 2, figsize=(14, 8.2), gridspec_kw={"hspace": 0.5, "wspace": 0.28})
+    ax = axs[0, 0]
+    labs = [r[0].replace(" ", "\n") for r in ring_k] + [n[1] for n in names2]
+    vals = [r[1] for r in ring_k] + [k2[n[0]] for n in names2]
+    cols = [fam[r[2]] for r in ring_k] + [fam[n[2]] for n in names2]
+    xs = list(range(4)) + list(range(5, 11))
+    ax.bar(xs, vals, color=cols); ax.axhline(1.0, color="#222222", ls="--", lw=1)
+    ax.set_xticks(xs); ax.set_xticklabels(labs, fontsize=7); ax.set_ylim(0.6, 1.1)
+    ax.text(1.5, 1.07, "ring (true κ = 3)", ha="center", fontsize=9); ax.text(7.5, 1.07, "2D torus (true κ = 4)", ha="center", fontsize=9)
+    ax.set_ylabel("learned κ divided by true κ"); ax.set_title("κ recovery", loc="left")
+    ax = axs[0, 1]
+    ring_best = max(h["heldout"] for h in cv["qmc_M1024"])
+    diffs = [max(h["heldout"] for h in cv["amortized"]) - ring_best]
+    for k, *_ in names2[:2][::-1]:
+        d = [t2[s][k]["history"][-1]["heldout"] - max(t2[s][b]["history"][-1]["heldout"] for b in ("qmc_M1024", "qmc_M4096", "grid_G32", "grid_G64")) for s in t2]
+        diffs.append(np.mean(d))
+    ax.bar([0, 2, 3], diffs, color=[C["amort"], C["amort"], C["amort2"]]); ax.axhline(0, color="#222222", lw=1)
+    ax.set_xticks([0, 2, 3]); ax.set_xticklabels(["ring\n(fixed κ)", "2D\nS=4", "2D\nS=2"], fontsize=8)
+    for x_, d in zip([0, 2, 3], diffs): ax.text(x_, 0.12 if d < 0 else d + 0.12, f"{d:+.2f}".replace("-", "−"), ha="center", fontsize=8)
+    ax.set_ylabel("held-out log p(y | b) per bin,\namortized minus best integrator"); ax.set_title("Fit quality (above 0 favors amortized)", loc="left")
+    ax = axs[1, 0]
+    items = [("preprint-style\ngrid over κ,\n2 folds", sp["kappa_selection_wall_s"]["preprint_style_qmc_M1024_grid_cv_extrapolated"], "#999999"),
+             ("amortized\nlearned κ", fit["amortized_free_kappa_3000"]["wall_s"], C["amort"]),
+             ("exact grid\nlearned κ", fit["exact_grid_free_kappa_learned_prior_3000"]["wall_s"], C["grid"]),
+             ("QMC 1024\nlearned κ", fit["qmc_M1024_free_kappa_3000"]["wall_s"], C["qmc"]),
+             ("QMC 128\nlearned κ", fit["qmc_M128_free_kappa_3000"]["wall_s"], C["qmc"])]
+    ax.bar(range(5), [i[1] for i in items], color=[i[2] for i in items])
+    for i, it in enumerate(items): ax.text(i, it[1] + 2, f"{it[1]:.0f} s", ha="center", fontsize=8)
+    ax.set_xticks(range(5)); ax.set_xticklabels([i[0] for i in items], fontsize=7); ax.set_ylabel("wall time to choose κ (s), ring")
+    ax.set_title("Cost of choosing κ", loc="left")
+    ax = axs[1, 1]
+    st = sp["steady_ms_per_step"]
+    ring_ms = [("amort.", st["amortized_encoder_G128"], "amort"), ("exact grid", st["exact_grid_marginal_no_encoder_G128"], "grid"),
+               ("QMC 1024", st["qmc_M1024_fixed_kappa"], "qmc"), ("QMC 128", st["qmc_M128_fixed_kappa"], "qmc")]
+    ms2 = [np.mean([t2[s][k]["ms_per_step"] for s in t2]) for k, *_ in names2]
+    labs = [r[0].replace(" ", "\n") for r in ring_ms] + [n[1] for n in names2]
+    vals = [r[1] for r in ring_ms] + ms2
+    cols = [fam[r[2]] for r in ring_ms] + [fam[n[2]] for n in names2]
+    ax.bar(xs, vals, color=cols); ax.set_xticks(xs); ax.set_xticklabels(labs, fontsize=7)
+    ax.set_ylim(0, max(vals) * 1.18); ax.text(1.5, max(vals) * 1.08, "ring", ha="center", fontsize=9); ax.text(7.5, max(vals) * 1.08, "2D torus", ha="center", fontsize=9)
+    ax.set_ylabel("ms per optimizer step"); ax.set_title("Cost per step", loc="left")
+    fig.savefig(f"{OUT}/scorecard.png")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     which = sys.argv[1:] or ["model", "gate", "smoke", "noisy", "speed", "torus"]
     if "model" in which: fig_model()
@@ -431,3 +539,5 @@ if __name__ == "__main__":
     if "kernels" in which: fig_kernels()
     if "kernelresults" in which: fig_kernel_results()
     if "variant" in which: fig_variant()
+    if "architecture" in which: fig_architecture()
+    if "scorecard" in which: fig_scorecard()
