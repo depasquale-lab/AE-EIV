@@ -50,3 +50,41 @@ def run_noisy(steps=3000, seed=0, T=3000, kappa=0.1):
         "mean_rate_corr": float(np.corrcoef(y_gen.mean(0), d["y"].mean(0))[0, 1]),
         "covariance_corr": M.offdiag_corr(np.cov(y_gen.T), np.cov(d["y"].T)),
     }
+
+
+# ------------------------------------------------------- paper-style examples
+
+def fit_free(d, i, steps=3000, seed=0, align=False):
+    """Fit one behavior setting of a shared-latent simulation with kappa learned."""
+    y, b = d["y"], d["b"][i]
+    T = len(y)
+    params, cfg, stats, feat, _ = fit(y, b, np.zeros(T, int), 1, steps=steps, seed=seed, verbose=False)
+    mu, rho, _ = m.posterior(params, cfg, feat, b, np.zeros(T, int))
+    mu = np.asarray(mu)
+    s, shift = 1.0, 0.0
+    if align:
+        _, (s, shift) = M.align(mu, d["x"])
+    mu_a = np.angle(np.exp(1j * (s * mu + shift)))
+    est = np.exp(np.asarray(m.log_rate_at(params, cfg, s * (d["ring"] - shift))))
+    return {"kappa": float(m.kappas(params, cfg)[0]), "mu": mu_a, "rho": np.asarray(rho),
+            "est": est, "sign": s, "shift": shift}
+
+
+def kappa_grid_cv(d, i, grid, folds=2, steps=1200, seed=0):
+    """Preprint protocol: fit with kappa fixed on each grid value, score held-out
+    log p(y | b) on random held-out bins. Returns (len(grid), folds)."""
+    y, b = d["y"], d["b"][i]
+    T = len(y)
+    rng = np.random.default_rng(100 + seed)
+    perm = rng.permutation(T)
+    parts = np.array_split(perm, 5)
+    out = np.zeros((len(grid), folds))
+    for f in range(folds):
+        te = np.sort(parts[f])
+        tr = np.setdiff1d(perm, te)
+        for ki, k in enumerate(grid):
+            params, cfg, _, _, _ = fit(y[tr], b[tr], np.zeros(len(tr), int), 1, steps=steps,
+                                       seed=seed, verbose=False, kappa_init=k, freeze_kappa=True)
+            joint, marg_b = m.heldout_loglik(params, cfg, y[te], b[te], np.zeros(len(te), int))
+            out[ki, f] = float(np.mean(joint - marg_b))
+    return out

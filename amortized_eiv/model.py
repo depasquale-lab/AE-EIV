@@ -170,6 +170,22 @@ def loss_fn(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     return -elbo.mean() + pen / T
 
 
+def heldout_loglik(params, cfg: Config, y, b, cond):
+    """Exact grid log p(y_t, b_t) and log p(b_t) per bin. Their difference is
+    log p(y_t | b_t), the quantity compared across kappa."""
+    kap = kappas(params, cfg)[cond]
+    lp = log_prior_grid(params, cfg)[None, :]
+    lb = log_beh_grid(cfg, b, kap)
+    joint = jax.scipy.special.logsumexp(lp + log_lik_grid(params, cfg, y) + lb, axis=-1)
+    marg_b = jax.scipy.special.logsumexp(lp + lb, axis=-1)
+    return joint, marg_b
+
+
+def log_rate_at(params, cfg: Config, x):
+    """log f_n(x) at arbitrary x, shape (len(x), N)."""
+    return params["b0"][None, :] + fourier_basis(jnp.asarray(x), cfg.J) @ params["W"]
+
+
 # ------------------------------------------------------------------- readout
 
 def posterior(params, cfg: Config, feat, b, cond, use_behavior=True):

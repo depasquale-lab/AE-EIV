@@ -20,3 +20,9 @@ def align(est, ref):
 def offdiag_corr(A, B):
     iu = np.triu_indices(A.shape[0], 1)
     return float(np.corrcoef(A[iu], B[iu])[0, 1])
+
+
+def kernel_tuning(y, b, ring, conc=20.0):
+    """Conventional tuning curves: von Mises kernel regression of rate on behavior."""
+    w = np.exp(conc * (np.cos(ring[:, None] - np.asarray(b)[None, :]) - 1.0))
+    return (w @ y) / w.sum(1, keepdims=True)

@@ -1,0 +1,6 @@
+free fit, true kappa 8.0: learned 8.53
+free fit, true kappa 3.0: learned 2.70
+free fit, true kappa 0.5: learned 0.43
+cv, true kappa 8.0: best grid kappa 8.0
+cv, true kappa 3.0: best grid kappa 3.0
+cv, true kappa 0.5: best grid kappa 0.5
