@@ -48,6 +48,22 @@
           "raw_behavior_err": 0.30040960341024125,
           "behavior_decode_err_gate_on": 0.07308151952395138
         }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 8.253520011901855,
+          "heldout": -56.34041976928711,
+          "behavior_decode_err": 0.07765953400117477,
+          "raw_behavior_err": 0.2540597367993231,
+          "behavior_decode_err_gate_on": 0.07610708107168113
+        },
+        {
+          "kappa": 7.9450273513793945,
+          "heldout": -56.77801513671875,
+          "behavior_decode_err": 0.08141666700150749,
+          "raw_behavior_err": 0.30040960341024125,
+          "behavior_decode_err_gate_on": 0.07967322383565788
+        }
       ]
     },
     "kappa3": {
@@ -98,6 +114,22 @@
           "raw_behavior_err": 0.5311616221783539,
           "behavior_decode_err_gate_on": 0.09095668079872424
         }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 2.9168264865875244,
+          "heldout": -57.09855270385742,
+          "behavior_decode_err": 0.07537774270455597,
+          "raw_behavior_err": 0.5420705768595667,
+          "behavior_decode_err_gate_on": 0.0738215326320247
+        },
+        {
+          "kappa": 3.0211687088012695,
+          "heldout": -57.281131744384766,
+          "behavior_decode_err": 0.09344258519284855,
+          "raw_behavior_err": 0.5311616221783539,
+          "behavior_decode_err_gate_on": 0.09342178786070594
+        }
       ]
     },
     "kappa0.5": {
@@ -147,6 +179,22 @@
           "behavior_decode_err": 0.25533118569376145,
           "raw_behavior_err": 1.325282251612117,
           "behavior_decode_err_gate_on": 0.2555373956966174
+        }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 0.44618332386016846,
+          "heldout": -57.84225845336914,
+          "behavior_decode_err": 0.2701315262777522,
+          "raw_behavior_err": 1.3107188153939113,
+          "behavior_decode_err_gate_on": 0.2703974462536886
+        },
+        {
+          "kappa": 0.4484924376010895,
+          "heldout": -58.06444549560547,
+          "behavior_decode_err": 0.23647304036360445,
+          "raw_behavior_err": 1.325282251612117,
+          "behavior_decode_err_gate_on": 0.23628655035685955
         }
       ]
     }
@@ -200,6 +248,22 @@
           "raw_behavior_err": 0.2703031335554583,
           "behavior_decode_err_gate_on": 0.5112689572218838
         }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 5.560074806213379,
+          "heldout": -8.374439239501953,
+          "behavior_decode_err": 0.5396252471305647,
+          "raw_behavior_err": 0.30464900491693253,
+          "behavior_decode_err_gate_on": 0.2816587708488465
+        },
+        {
+          "kappa": 5.350543975830078,
+          "heldout": -8.39355182647705,
+          "behavior_decode_err": 0.6341999125112622,
+          "raw_behavior_err": 0.2703031335554583,
+          "behavior_decode_err_gate_on": 0.3316844408965731
+        }
       ]
     },
     "kappa3": {
@@ -249,6 +313,22 @@
           "behavior_decode_err": 0.6001609146943797,
           "raw_behavior_err": 0.5134571470787727,
           "behavior_decode_err_gate_on": 0.4720187962724751
+        }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 2.589320421218872,
+          "heldout": -8.609553337097168,
+          "behavior_decode_err": 0.5400932327784477,
+          "raw_behavior_err": 0.5272225738355677,
+          "behavior_decode_err_gate_on": 0.3574994637143746
+        },
+        {
+          "kappa": 2.628572463989258,
+          "heldout": -8.607969284057617,
+          "behavior_decode_err": 0.5514247296544695,
+          "raw_behavior_err": 0.5134571470787727,
+          "behavior_decode_err_gate_on": 0.37550392982251984
         }
       ]
     }
@@ -301,6 +381,22 @@
           "behavior_decode_err": 0.0738807471993689,
           "raw_behavior_err": 0.33506120522870064,
           "behavior_decode_err_gate_on": 0.07553047849952083
+        }
+      ],
+      "gated_encoder_warp": [
+        {
+          "kappa": 6.504674911499023,
+          "heldout": -56.64467239379883,
+          "behavior_decode_err": 0.087772636443476,
+          "raw_behavior_err": 0.3020076097112437,
+          "behavior_decode_err_gate_on": 0.08544841453648072
+        },
+        {
+          "kappa": 5.508803367614746,
+          "heldout": -56.98586654663086,
+          "behavior_decode_err": 0.07856730190057305,
+          "raw_behavior_err": 0.33506120522870064,
+          "behavior_decode_err_gate_on": 0.07539076051370602
         }
       ]
     }

@@ -65,7 +65,7 @@ On the ring the latent lives on a grid of 128 points, so the ELBO is an exact su
 - When behavior is nearly noise, the fit reproduces the neural mean rates and covariance.
 - In one dimension the amortized model is not faster, except that learning κ in one fit is about 6 times cheaper than a grid over κ with folds. Baselines can learn κ too.
 - In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ.
-- A neural-only encoder with a separate behavior decoder (no behavior input) matches the gated encoder with strong neural information and loses with weak information. A learned behavior decoder helps when behavior is offset from the latent.
+- Removing the behavior encoder costs κ accuracy with weak neural information. A learned behavior decoder, with both encoders kept, recovers κ and decodes behavior when behavior is offset from the latent.
 - Replacing the Matérn-type tuning prior with an infinitely wide ReLU network kernel (NNGP) brings no gain over a smoother Matérn prior. Depth 1 fails when tuning curves have energy at odd harmonics above 1.
 
 ![Scorecard against a preprint-style baseline](figures/scorecard.png)
@@ -229,50 +229,56 @@ Setup (`scripts/kernel_comparison.py`, `scripts/kernel_torus2d.py`, about 15 min
 
 In this test an architecture-derived prior brought no advantage over tuning the smoothness of the Matérn prior. Choosing the smoothness by cross-validation, as the preprint does for its kernel hyperparameters, is the better comparison and is untested.
 
-### Neural encoder only, with a separate behavior decoder
+### Both encoders, an ablation, and a learned behavior decoder
 
-The gated encoder ties the behavior input to the behavior decoder through a single κ. An alternative keeps two encoders and two decoders and drops the behavior encoder entirely. The encoder q(x | y) sees only neural activity. Behavior enters only through its decoder p(b | x), which is a von Mises density around the latent with concentration κ, or equivalently through the conditional prior p(x | b). When behavior is noisy, κ goes to 0 and the behavior term is flat. The model is then a neural encoder and decoder with a learned prior. When behavior is clean, the behavior decoder pulls the latent toward behavior, so behavior can be decoded from neural activity alone. In the code this is `fit(..., p_drop=1.0)`, which sets the gate to zero in every bin. The generative model is unchanged.
+The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent when κ is 0. The neural encoder, the neural decoder, and the behavior decoder stay. This is the gated encoder described above. An earlier version of this section presented removing the behavior encoder as a second formulation. It is an ablation, and it is reported here as one.
 
 ![Architecture variants](figures/architecture_variants.png)
 
-*Left: the gated encoder, where one κ sets both the behavior encoder's weight and the behavior decoder's precision. Right: the neural-encoder-only variant, where the behavior encoder is absent and behavior enters through its decoder. In both, setting κ to 0 leaves the neural encoder and decoder in place.*
+*Left: the full model, with a behavior encoder whose weight is κ. Right: the ablation, with the behavior encoder removed so that behavior reaches the latent only through its decoder.*
 
-A further option learns the behavior decoder. With `Config(beh_warp=3)` the mean direction of behavior is g(x) = x + w₀ + Σ (aₖ sin kx + cₖ cos kx), where the weights start at 0 so g starts as the identity. The gate cannot do this, because its behavior input assumes that behavior is centered on the latent.
+Two things are tested against the full model. The ablation removes the behavior encoder in every bin (`fit(..., p_drop=1.0)`). The generative model is unchanged. The learned behavior decoder is selected with `Config(beh_warp=3)`. The mean direction of behavior becomes g(x) = x + w₀ + Σ (aₖ sin kx + cₖ cos kx), where the weights start at 0 so g starts as the identity. The behavior encoder uses the same map, κ cos(b − g(x)), so both encoders stay present.
 
-![Neural encoder only](figures/neural_encoder_variant.png)
+![Variant comparison](figures/neural_encoder_variant.png)
 
 *Left: error of decoding mean behavior from neural activity alone, with strong neural information. Middle: learned κ with weak neural information, with the dashed line at the true value. Right: behavior generated as b = x + 0.4 + 0.5 sin x plus von Mises noise with κ = 6. Grey ticks are the error of the raw measured behavior against the noise-free mean.*
 
-Setup (`scripts/neural_encoder_variant.py`, about 12 minutes). Ring data with 80% of the bins for training and 20% for scoring, κ learned for 3000 steps, and 2 seeds. All variants are scored without the behavior input at test time: the error of g(μ(y)) against the noise-free mean behavior, which is known only in simulation, together with held-out log p(y | b) and learned κ. Strong neural information is N = 30 with GP tuning. Weak is N = 8 with low rates. In the offset data the mean behavior is b = x + 0.4 + 0.5 sin x.
+Setup (`scripts/neural_encoder_variant.py`, about 16 minutes). Ring data with 80% of the bins for training and 20% for scoring, κ learned for 3000 steps, and 2 seeds. All variants are scored without the behavior input at test time: the error of g(μ(y)) against the noise-free mean behavior, which is known only in simulation, together with held-out log p(y | b) and learned κ. Strong neural information is N = 30 with GP tuning. Weak is N = 8 with low rates. In the offset data the mean behavior is b = x + 0.4 + 0.5 sin x.
 
 | Data, true κ | Variant | κ learned | Held-out log p(y given b) | Behavior-decode error (rad), seeds | Raw behavior error (rad) |
 | --- | --- | --- | --- | --- | --- |
-| strong neural information, 8.0 | Gated encoder | 8.01 | −56.563 | 0.073 (0.07, 0.07) | 0.277 |
-| strong neural information, 8.0 | Neural encoder only | 7.81 | −56.560 | 0.072 (0.07, 0.07) | 0.277 |
-| strong neural information, 8.0 | Neural encoder only, learned behavior decoder | 7.89 | −56.558 | 0.073 (0.07, 0.07) | 0.277 |
-| strong neural information, 3.0 | Gated encoder | 2.95 | −57.187 | 0.079 (0.07, 0.08) | 0.537 |
-| strong neural information, 3.0 | Neural encoder only | 2.94 | −57.185 | 0.076 (0.08, 0.08) | 0.537 |
-| strong neural information, 3.0 | Neural encoder only, learned behavior decoder | 2.95 | −57.188 | 0.082 (0.07, 0.09) | 0.537 |
-| strong neural information, 0.5 | Gated encoder | 0.42 | −57.968 | 0.301 (0.26, 0.34) | 1.318 |
-| strong neural information, 0.5 | Neural encoder only | 0.26 | −57.952 | 0.851 (0.22, 1.48) | 1.318 |
-| strong neural information, 0.5 | Neural encoder only, learned behavior decoder | 0.42 | −57.933 | 0.237 (0.22, 0.26) | 1.318 |
-| weak neural information, 8.0 | Gated encoder | 5.47 | −8.383 | 0.578 (0.55, 0.61) | 0.287 |
-| weak neural information, 8.0 | Neural encoder only | 3.45 | −8.411 | 0.636 (0.58, 0.69) | 0.287 |
-| weak neural information, 8.0 | Neural encoder only, learned behavior decoder | 3.44 | −8.411 | 0.622 (0.56, 0.68) | 0.287 |
-| weak neural information, 3.0 | Gated encoder | 2.60 | −8.610 | 0.553 (0.52, 0.58) | 0.520 |
-| weak neural information, 3.0 | Neural encoder only | 2.23 | −8.620 | 0.584 (0.56, 0.60) | 0.520 |
-| weak neural information, 3.0 | Neural encoder only, learned behavior decoder | 2.24 | −8.618 | 0.581 (0.56, 0.60) | 0.520 |
-| offset behavior, 6.0 | Gated encoder | 5.22 | −56.892 | 0.164 (0.15, 0.18) | 0.319 |
-| offset behavior, 6.0 | Neural encoder only | 5.17 | −56.893 | 0.153 (0.13, 0.18) | 0.319 |
-| offset behavior, 6.0 | Neural encoder only, learned behavior decoder | 5.91 | −56.813 | 0.075 (0.08, 0.07) | 0.319 |
+| strong neural information, 8.0 | Full model (both encoders) | 8.01 | −56.563 | 0.073 (0.07, 0.07) | 0.277 |
+| strong neural information, 8.0 | Full model + learned behavior decoder | 8.10 | −56.559 | 0.080 (0.08, 0.08) | 0.277 |
+| strong neural information, 8.0 | Ablation: behavior encoder removed | 7.81 | −56.560 | 0.072 (0.07, 0.07) | 0.277 |
+| strong neural information, 8.0 | Ablation + learned behavior decoder | 7.89 | −56.558 | 0.073 (0.07, 0.07) | 0.277 |
+| strong neural information, 3.0 | Full model (both encoders) | 2.95 | −57.187 | 0.079 (0.07, 0.08) | 0.537 |
+| strong neural information, 3.0 | Full model + learned behavior decoder | 2.97 | −57.190 | 0.084 (0.08, 0.09) | 0.537 |
+| strong neural information, 3.0 | Ablation: behavior encoder removed | 2.94 | −57.185 | 0.076 (0.08, 0.08) | 0.537 |
+| strong neural information, 3.0 | Ablation + learned behavior decoder | 2.95 | −57.188 | 0.082 (0.07, 0.09) | 0.537 |
+| strong neural information, 0.5 | Full model (both encoders) | 0.42 | −57.968 | 0.301 (0.26, 0.34) | 1.318 |
+| strong neural information, 0.5 | Full model + learned behavior decoder | 0.45 | −57.953 | 0.253 (0.27, 0.24) | 1.318 |
+| strong neural information, 0.5 | Ablation: behavior encoder removed | 0.26 | −57.952 | 0.851 (0.22, 1.48) | 1.318 |
+| strong neural information, 0.5 | Ablation + learned behavior decoder | 0.42 | −57.933 | 0.237 (0.22, 0.26) | 1.318 |
+| weak neural information, 8.0 | Full model (both encoders) | 5.47 | −8.383 | 0.578 (0.55, 0.61) | 0.287 |
+| weak neural information, 8.0 | Full model + learned behavior decoder | 5.46 | −8.384 | 0.587 (0.54, 0.63) | 0.287 |
+| weak neural information, 8.0 | Ablation: behavior encoder removed | 3.45 | −8.411 | 0.636 (0.58, 0.69) | 0.287 |
+| weak neural information, 8.0 | Ablation + learned behavior decoder | 3.44 | −8.411 | 0.622 (0.56, 0.68) | 0.287 |
+| weak neural information, 3.0 | Full model (both encoders) | 2.60 | −8.610 | 0.553 (0.52, 0.58) | 0.520 |
+| weak neural information, 3.0 | Full model + learned behavior decoder | 2.61 | −8.609 | 0.546 (0.54, 0.55) | 0.520 |
+| weak neural information, 3.0 | Ablation: behavior encoder removed | 2.23 | −8.620 | 0.584 (0.56, 0.60) | 0.520 |
+| weak neural information, 3.0 | Ablation + learned behavior decoder | 2.24 | −8.618 | 0.581 (0.56, 0.60) | 0.520 |
+| offset behavior, 6.0 | Full model (both encoders) | 5.22 | −56.892 | 0.164 (0.15, 0.18) | 0.319 |
+| offset behavior, 6.0 | Full model + learned behavior decoder | 6.01 | −56.815 | 0.083 (0.09, 0.08) | 0.319 |
+| offset behavior, 6.0 | Ablation: behavior encoder removed | 5.17 | −56.893 | 0.153 (0.13, 0.18) | 0.319 |
+| offset behavior, 6.0 | Ablation + learned behavior decoder | 5.91 | −56.813 | 0.075 (0.08, 0.07) | 0.319 |
 
-- With strong neural information the three variants are indistinguishable at κ = 8 and 3. Learned κ is 7.8 to 8.0 and 2.94 to 2.95, held-out scores agree to 3 decimals, and behavior-decode error is 0.07 to 0.08 rad against 0.28 to 0.54 for raw behavior.
-- At κ = 0.5 the neural-only encoder failed on one of two seeds (decode error 0.22 and 1.48, against 0.26 and 0.34 for the gated encoder). With no behavior input and little behavioral information, nothing pins the coordinate frame of the latent. Held-out score is unaffected, since behavior says little about y at low κ. This is two seeds and is an observation, not a rate.
-- With weak neural information the neural-only encoder is worse. Learned κ is 3.45 against 5.47 at true κ = 8, and 2.23 against 2.60 at 3. Decode error is 0.64 against 0.58, and 0.58 against 0.55. Held-out differs by 0.03 and 0.01 nats per bin. This is the amortization gap again. An encoder that must infer x from few spikes underestimates κ, and the gate helps by supplying behavior.
-- The learned behavior decoder helps when behavior is offset from the latent. Behavior-decode error is 0.075 against 0.15 to 0.16 with the identity decoder, learned κ is 5.91 against 5.2 (true 6), and held-out is 0.08 nats per bin better. The tuning curves absorb part of an offset, which is why the identity versions are not worse by more. The gated encoder has no way to represent the offset.
-- With nearly noise behavior (κ = 0.1, T = 3000, one seed) both variants become neural generative models. Learned κ is 0.108 and 0.119. Samples from the learned prior match the data in mean rate (r = 0.988 and 0.986) and neural covariance (r = 0.997 and 0.996). The aligned latent error differs, at 0.34 and 0.76 rad. The runs differ in their training-time gate and random stream, so I treat that as run-to-run variation, and it was not tested.
+- With strong neural information the four variants are alike at κ = 8 and 3. Learned κ is 7.8 to 8.1 and 2.94 to 2.97, held-out scores agree within 0.004 nats per bin, and behavior-decode error is 0.07 to 0.08 rad against 0.28 and 0.54 for raw behavior.
+- At κ = 0.5 the full model kept the latent's coordinate frame on both seeds, with and without the learned decoder (decode error 0.26 and 0.34, and 0.27 and 0.24). The ablation without the learned decoder failed on one of two seeds (0.22 and 1.48). With the learned decoder it did not (0.22 and 0.26). This is two seeds and is an observation, not a rate.
+- With weak neural information the full model learns a κ closer to the truth. At true κ = 8 it learns 5.46 to 5.47 against 3.44 to 3.45 for the ablations, and at true κ = 3 it learns 2.60 to 2.61 against 2.23 to 2.24. Held-out differs by 0.03 and 0.01 nats per bin. Without the behavior encoder, the encoder has to infer x from few spikes, so κ is underestimated. This is the amortization gap again. Decoding behavior from eight neurons alone is worse than the raw measurement in every variant.
+- With a systematic offset between latent and behavior, the learned behavior decoder helps. With the identity decoder the full model has decode error 0.164 and κ of 5.22. With the learned decoder it has 0.083 and 6.01 (true 6), and held-out improves by 0.08 nats per bin. The ablation with the learned decoder gives 0.075 and 5.91. The tuning curves absorb part of an offset, which is why the identity versions are not worse by more.
+- With nearly noise behavior (κ = 0.1, T = 3000, one seed), the full model and the ablation both become neural generative models. Learned κ is 0.108 and 0.119. Samples from the learned prior match the data in mean rate (r = 0.988 and 0.986) and neural covariance (r = 0.997 and 0.996). The aligned latent error differs, at 0.34 and 0.76 rad. The runs differ in their training-time gate and random stream, so I treat that as run-to-run variation, and it was not tested.
 
-The neural-encoder-only formulation matches the gated encoder when neural information is strong and loses when it is weak. It is the more general of the two, because its behavior decoder is separate and can be learned.
+The full model with a learned behavior decoder was within 0.02 rad of the best decode error in every setting, and it had the best or tied-best κ in the weak-information and offset settings. Removing the behavior encoder cost κ accuracy with weak neural information and, on one seed, the latent's coordinate frame.
 
 ## Design notes
 
@@ -282,9 +288,9 @@ What the approach enables. Learning κ by gradient does not need the encoder. Ba
 
 Why behavior gates the encoder input. Given the latent, the behavior term is a von Mises density, exp(κ cos(b − x)), with complex parameter κ e^{ib}. Von Mises densities multiply by adding their complex parameters, so the exact posterior is z = z_ψ(y) + κ e^{ib}, and the gate is κ itself with no extra trust parameters. This is exact on the ring if z_ψ is read as an amortized likelihood and the prior is flat. On the torus the encoder is a Gaussian network with behavior scaled by κ as an input, which is not exact. The gate has not been compared with concatenating b into the network.
 
-Two formulations. In the gated encoder one κ sets both the behavior encoder's weight and the behavior decoder's precision. In the neural-encoder-only version the behavior encoder is absent and behavior enters through its decoder. With κ = 0, both keep the neural encoder, the neural decoder, and the behavior decoder, and the behavior decoder becomes flat. With strong neural information they perform alike. With weak neural information the gate is better, and with a systematic offset between latent and behavior the learned behavior decoder is better.
+Encoders and decoders. The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent at κ = 0 while the neural encoder, the neural decoder, and the behavior decoder remain. Removing the behavior encoder is an ablation. With strong neural information it makes no difference. With weak neural information it lowers the learned κ, and on one seed at κ = 0.5 it lost the latent's coordinate frame. A learned behavior decoder, with the behavior encoder kept consistent with it, handles a systematic offset between latent and behavior.
 
-The prior when behavior is noisy. The conditional prior is p(x | b) ∝ p_φ(x) VM(b | x, κ). As κ goes to 0 it becomes p_φ(x), which is fit to the latents that the neural data occupy. The model is then a neural VAE with a learned prior, and samples from it match the data's mean rates and covariance. A network that learns p(x | b) directly, as in the original sketch, is not implemented. The learned behavior decoder is the closest analogue.
+The prior when behavior is noisy. The conditional prior is p(x | b) ∝ p_φ(x) VM(b | x, κ). As κ goes to 0 it becomes p_φ(x), which is fit to the latents that the neural data occupy. The model is then a neural VAE with a learned prior, and samples from it match the data's mean rates and covariance. A network that learns p(x | b) directly, as in the original sketch, is not implemented. The learned behavior decoder, with the matching behavior encoder, is the closest analogue.
 
 The tuning prior. The decoder's weight prior is the weight-space form of a Gaussian process with a Matérn-type spectrum. An infinitely wide ReLU network kernel (NNGP) is available as an option and gave no advantage over a smoother Matérn prior. This is the NNGP and not the neural tangent kernel, because the latent is learned and the tangent kernel's fixed-feature regime does not apply.
 
@@ -300,7 +306,7 @@ Against the preprint's approach. On the ring, learning κ in one fit is about 6 
 - Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparisons use stand-in baselines, and an L-BFGS baseline was tried. The preprint's own implementation was not.
 - The speed results are from one dataset, one fold, and a one-dimensional latent. In the 2D torus the amortized model was cheaper per step but did not match the integrators' fit quality or recover κ. Latents of three or more dimensions are untested.
 - The kernel comparison uses two seeds and simulated data. The default Matérn hyperparameters were not tuned, and only a ReLU network without bias was tried, with depth as the only architecture choice. Real tuning curves were not tested.
-- The neural-encoder-only comparison uses two seeds and simulated data. The learned behavior decoder has 3 harmonics, and the offset it recovers was built into the simulation.
+- The behavior-encoder comparison uses two seeds and simulated data. The learned behavior decoder has 3 harmonics, and the offset it recovers was built into the simulation.
 - One κ per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The ring latent is a grid of 128 points, a fixed approximation.
 
 ## Next steps
@@ -328,7 +334,7 @@ python scripts/benchmark_torus2d.py     # 2D torus benchmark, about 11 minutes
 python scripts/kernel_comparison.py     # ring tuning-prior comparison, about 10 minutes
 python scripts/kernel_comparison.py --control   # Matérn smoothness control, about 3 minutes
 python scripts/kernel_torus2d.py        # torus tuning-prior comparison, about 5 minutes
-python scripts/neural_encoder_variant.py   # neural-only encoder and learned behavior decoder, about 12 minutes
+python scripts/neural_encoder_variant.py   # behavior-encoder ablation and learned behavior decoder, about 16 minutes
 python scripts/make_figures.py          # rebuild figures/ from the saved results
 ```
 

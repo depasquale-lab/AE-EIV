@@ -368,22 +368,23 @@ def fig_kernel_results():
 
 # --------------------------------------------------- neural-encoder-only variant
 
-VCOL = {"gated_encoder": "#1f5fa8", "neural_encoder_only": "#e08a1e", "neural_encoder_only_warp": "#2e9e5b"}
-VLAB = {"gated_encoder": "gated encoder", "neural_encoder_only": "neural encoder only",
-        "neural_encoder_only_warp": "neural encoder only + learned behavior decoder"}
+VCOL = {"gated_encoder": "#1f5fa8", "gated_encoder_warp": "#2e9e5b", "neural_encoder_only": "#e08a1e",
+        "neural_encoder_only_warp": "#f2c27a"}
+VLAB = {"gated_encoder": "full model (both encoders)", "gated_encoder_warp": "full model + learned behavior decoder",
+        "neural_encoder_only": "ablation: behavior encoder removed", "neural_encoder_only_warp": "ablation + learned behavior decoder"}
 
 
 def fig_variant():
     r = json.load(open("results/neural_encoder_variant.json"))
     names = list(VCOL)
     fig, axs = plt.subplots(1, 3, figsize=(16, 4.3), gridspec_kw={"wspace": 0.32})
-    w = 0.26
+    w = 0.2
 
     def bars(ax, x, key, metric, per_seed=True):
         for ni, n in enumerate(names):
             vals = [x_[metric] for x_ in r[key[0]][key[1]][n]]
-            ax.bar(x + (ni - 1) * w, np.mean(vals), w, color=VCOL[n])
-            if per_seed: ax.scatter([x + (ni - 1) * w] * len(vals), vals, color="#444444", s=10, zorder=3)
+            ax.bar(x + (ni - 1.5) * w, np.mean(vals), w, color=VCOL[n])
+            if per_seed: ax.scatter([x + (ni - 1.5) * w] * len(vals), vals, color="#444444", s=10, zorder=3)
 
     ax = axs[0]
     ks = ["kappa8", "kappa3", "kappa0.5"]
@@ -397,7 +398,7 @@ def fig_variant():
     ax = axs[1]
     for ci, k in enumerate(["kappa8", "kappa3"]):
         bars(ax, ci, ("weak", k), "kappa")
-        ax.hlines(float(k[5:]), ci - 0.45, ci + 0.45, color="#222222", ls="--", lw=1)
+        ax.hlines(float(k[5:]), ci - 0.5, ci + 0.5, color="#222222", ls="--", lw=1)
     ax.set_xticks(range(2)); ax.set_xticklabels(["true κ = 8", "true κ = 3"]); ax.set_ylabel("learned κ")
     ax.set_title("Weak neural information (N = 8): learned κ", loc="left")
     ax = axs[2]
@@ -406,16 +407,16 @@ def fig_variant():
     ax.scatter([0], [raw], marker="_", s=500, color="#888888", zorder=2)
     for ni, n in enumerate(names):
         k = np.mean([x["kappa"] for x in r["biased"]["kappa6"][n]])
-        ax.text((ni - 1) * w, 0.003, f"κ {k:.1f}", ha="center", va="bottom", fontsize=8, color="white")
+        ax.text((ni - 1.5) * w, 0.003, f"κ {k:.1f}", ha="center", va="bottom", fontsize=7, color="white")
     ax.set_xticks([0]); ax.set_xticklabels(["b = x + 0.4 + 0.5 sin x, κ = 6"])
-    ax.set_xlim(-0.6, 0.6); ax.set_ylabel("error decoding mean behavior from neural activity (rad)")
+    ax.set_xlim(-0.7, 0.7); ax.set_ylabel("error decoding mean behavior from neural activity (rad)")
     ax.set_title("Systematic offset between latent and behavior", loc="left")
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
     handles = [Patch(color=VCOL[n], label=VLAB[n]) for n in names] + [
         Line2D([], [], color="#888888", marker="_", ms=14, ls="", label="raw measured behavior (panels 1 and 3)"),
         Line2D([], [], color="#444444", marker="o", ms=4, ls="", label="single seed (bars are means)")]
-    fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, fontsize=8, bbox_to_anchor=(0.5, -0.1))
+    fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=8, bbox_to_anchor=(0.5, -0.16))
     fig.savefig(f"{OUT}/neural_encoder_variant.png")
     plt.close(fig)
 
@@ -424,34 +425,33 @@ def fig_variant():
 
 def fig_architecture():
     ENC, DEC, BEH = ("#eef3fa", "#1f5fa8"), ("#eaf6ee", "#2e9e5b"), ("#fdf1df", "#e08a1e")
-    fig, axs = plt.subplots(1, 2, figsize=(16, 5.6))
+    fig, axs = plt.subplots(1, 2, figsize=(16, 5.8))
     for ax in axs:
         ax.set_xlim(0, 12.4); ax.set_ylim(0, 7.6); ax.axis("off")
-    # ---- tied gate
     ax = axs[0]
-    ax.set_title("Gated encoder: one κ ties the behavior input to the behavior decoder", loc="left", fontweight="bold", fontsize=10.5)
+    ax.set_title("Full model: two encoders and two decoders", loc="left", fontweight="bold", fontsize=10.5)
     node(ax, (0.6, 5.3), 0.5, "y", fc="#e9e9e9"); node(ax, (0.6, 2.2), 0.5, "b", fc="#e9e9e9")
     box(ax, (1.5, 4.8), 2.4, 1.0, "neural encoder\nz$_ψ$(y)", fc=ENC[0], ec=ENC[1], fs=9)
-    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\nκ e$^{ib}$", fc=BEH[0], ec=BEH[1], fs=9)
+    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\nκ cos(b − g(x))", fc=BEH[0], ec=BEH[1], fs=9)
     arrow(ax, (1.1, 5.3), (1.5, 5.3)); arrow(ax, (1.1, 2.2), (1.5, 2.2))
     node(ax, (4.8, 3.75), 0.4, "+", fs=13)
     arrow(ax, (3.9, 5.3), (4.6, 4.05)); arrow(ax, (3.9, 2.2), (4.6, 3.45))
     node(ax, (6.3, 3.75), 0.5, "x")
     arrow(ax, (5.2, 3.75), (5.8, 3.75), "q(x|y,b)", off=(0, 0.45), fs=8)
     box(ax, (7.6, 4.8), 2.5, 1.0, "neural decoder\np(y|x)", fc=DEC[0], ec=DEC[1], fs=9)
-    box(ax, (7.6, 1.7), 2.5, 1.0, "behavior decoder\nVM(b | x, κ)", fc=DEC[0], ec=DEC[1], fs=9)
+    box(ax, (7.6, 1.7), 2.5, 1.0, "behavior decoder\nVM(b | g(x), κ)", fc=DEC[0], ec=DEC[1], fs=9)
     arrow(ax, (6.7, 4.0), (7.6, 5.1)); arrow(ax, (6.7, 3.5), (7.6, 2.4))
     node(ax, (11.2, 5.3), 0.5, "ŷ", fc="#e9e9e9"); node(ax, (11.2, 2.2), 0.5, "b̂", fc="#e9e9e9")
     arrow(ax, (10.1, 5.3), (10.7, 5.3)); arrow(ax, (10.1, 2.2), (10.7, 2.2))
-    ax.text(6.2, 0.95, "κ → 0: the behavior encoder's weight goes to 0. The neural encoder, neural decoder,\nand behavior decoder remain, and the behavior decoder becomes flat.",
+    ax.text(2.7, 1.3, "weight κ, so it is effectively\nabsent when κ = 0", fontsize=8, color="#c0701a", ha="center", va="top")
+    ax.text(6.2, 0.55, "κ → 0: the behavior encoder drops out. The neural encoder, neural decoder,\nand behavior decoder remain. g(x) = x by default, or a learned warp.",
             ha="center", va="top", fontsize=9)
-    # ---- neural encoder only
     ax = axs[1]
-    ax.set_title("Neural encoder only: behavior enters through its decoder", loc="left", fontweight="bold", fontsize=10.5)
+    ax.set_title("Ablation: behavior encoder removed", loc="left", fontweight="bold", fontsize=10.5)
     node(ax, (0.6, 5.3), 0.5, "y", fc="#e9e9e9")
     box(ax, (1.5, 4.8), 2.4, 1.0, "neural encoder\nq(x | y)", fc=ENC[0], ec=ENC[1], fs=9)
     arrow(ax, (1.1, 5.3), (1.5, 5.3))
-    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\n(dropped: gate off\nin every bin)", fc="white", ec="#aaaaaa", fs=8, ls="--", tc="#999999")
+    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\n(removed: gate off\nin every bin)", fc="white", ec="#aaaaaa", fs=8, ls="--", tc="#999999")
     node(ax, (6.3, 3.75), 0.5, "x")
     arrow(ax, (3.9, 5.3), (5.85, 4.0))
     box(ax, (7.6, 4.8), 2.5, 1.0, "neural decoder\np(y|x)", fc=DEC[0], ec=DEC[1], fs=9)
@@ -460,8 +460,7 @@ def fig_architecture():
     node(ax, (11.2, 5.3), 0.5, "ŷ", fc="#e9e9e9"); node(ax, (11.2, 2.2), 0.5, "b", fc="#e9e9e9")
     arrow(ax, (10.1, 5.3), (10.7, 5.3)); arrow(ax, (10.1, 2.2), (10.7, 2.2))
     ax.text(10.9, 3.35, "target", fontsize=8, color="#555555", ha="center")
-    ax.text(8.85, 1.15, "g(x) = x by default,\nor a learned warp", fontsize=8, color="#555555", ha="center", va="top")
-    ax.text(6.2, 0.35, "κ → 0: the behavior term is flat, leaving a neural encoder and decoder with a learned prior.\nκ large: the behavior decoder pulls x toward b, so b can be decoded from y alone.",
+    ax.text(6.2, 0.55, "Behavior reaches the latent only through its decoder. This tests what the behavior\nencoder adds, and is not the full model.",
             ha="center", va="top", fontsize=9)
     fig.savefig(f"{OUT}/architecture_variants.png")
     plt.close(fig)

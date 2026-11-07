@@ -1,0 +1,12 @@
+strong 8.0 0 gated_encoder_warp {'kappa': 8.254, 'heldout': -56.34, 'behavior_decode_err': 0.078, 'raw_behavior_err': 0.254, 'behavior_decode_err_gate_on': 0.076}
+strong 3.0 0 gated_encoder_warp {'kappa': 2.917, 'heldout': -57.099, 'behavior_decode_err': 0.075, 'raw_behavior_err': 0.542, 'behavior_decode_err_gate_on': 0.074}
+strong 0.5 0 gated_encoder_warp {'kappa': 0.446, 'heldout': -57.842, 'behavior_decode_err': 0.27, 'raw_behavior_err': 1.311, 'behavior_decode_err_gate_on': 0.27}
+weak 8.0 0 gated_encoder_warp {'kappa': 5.56, 'heldout': -8.374, 'behavior_decode_err': 0.54, 'raw_behavior_err': 0.305, 'behavior_decode_err_gate_on': 0.282}
+weak 3.0 0 gated_encoder_warp {'kappa': 2.589, 'heldout': -8.61, 'behavior_decode_err': 0.54, 'raw_behavior_err': 0.527, 'behavior_decode_err_gate_on': 0.357}
+biased 6.0 0 gated_encoder_warp {'kappa': 6.505, 'heldout': -56.645, 'behavior_decode_err': 0.088, 'raw_behavior_err': 0.302, 'behavior_decode_err_gate_on': 0.085}
+strong 8.0 1 gated_encoder_warp {'kappa': 7.945, 'heldout': -56.778, 'behavior_decode_err': 0.081, 'raw_behavior_err': 0.3, 'behavior_decode_err_gate_on': 0.08}
+strong 3.0 1 gated_encoder_warp {'kappa': 3.021, 'heldout': -57.281, 'behavior_decode_err': 0.093, 'raw_behavior_err': 0.531, 'behavior_decode_err_gate_on': 0.093}
+strong 0.5 1 gated_encoder_warp {'kappa': 0.448, 'heldout': -58.064, 'behavior_decode_err': 0.236, 'raw_behavior_err': 1.325, 'behavior_decode_err_gate_on': 0.236}
+weak 8.0 1 gated_encoder_warp {'kappa': 5.351, 'heldout': -8.394, 'behavior_decode_err': 0.634, 'raw_behavior_err': 0.27, 'behavior_decode_err_gate_on': 0.332}
+weak 3.0 1 gated_encoder_warp {'kappa': 2.629, 'heldout': -8.608, 'behavior_decode_err': 0.551, 'raw_behavior_err': 0.513, 'behavior_decode_err_gate_on': 0.376}
+biased 6.0 1 gated_encoder_warp {'kappa': 5.509, 'heldout': -56.986, 'behavior_decode_err': 0.079, 'raw_behavior_err': 0.335, 'behavior_decode_err_gate_on': 0.075}

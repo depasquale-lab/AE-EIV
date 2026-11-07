@@ -125,6 +125,19 @@ def log_q_grid(z, cfg: Config):
     return jax.nn.log_softmax(logits, axis=-1)
 
 
+def encoder_logq(params, cfg: Config, feat, b, gate):
+    """log q(x_g | y, b) on the grid. The neural expert is a von Mises term from the network on y.
+    The behavior expert is gate * cos(b - g(x_g)), which is the behavior decoder's likelihood as a
+    function of x. With g = identity this equals adding gate * exp(ib) to the complex parameter,
+    so the behavior encoder is present and drops out as the gate goes to 0."""
+    z_y = _mlp(params["enc"], feat)
+    g = grid(cfg)
+    logits = z_y[:, 0:1] * jnp.cos(g) + z_y[:, 1:2] * jnp.sin(g)
+    gx = beh_mean_at(params, cfg, g)
+    logits = logits + gate[:, None] * jnp.cos(b[:, None] - gx[None, :])
+    return jax.nn.log_softmax(logits, axis=-1)
+
+
 def log_prior_grid(params, cfg: Config):
     g = grid(cfg)
     if not cfg.learn_prior:
@@ -172,8 +185,7 @@ def elbo_per_bin(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     """Per-bin ELBO on log p(y_t, b_t), and the exact grid log marginal."""
     kap = kappas(params, cfg)[cond]
     gate = kap if gate_mask is None else kap * gate_mask
-    z = encoder_z(params, feat, b, gate)
-    logq = log_q_grid(z, cfg)
+    logq = encoder_logq(params, cfg, feat, b, gate)
     joint = (log_prior_grid(params, cfg)[None, :]
              + log_lik_grid(params, cfg, y)
              + log_beh_grid(cfg, b, kap, params))
@@ -214,7 +226,7 @@ def posterior(params, cfg: Config, feat, b, cond, use_behavior=True):
     """Posterior mean direction mu_t, resultant length rho_t, and q on the grid."""
     kap = kappas(params, cfg)[cond]
     gate = kap if use_behavior else jnp.zeros_like(kap)
-    q = jnp.exp(log_q_grid(encoder_z(params, feat, b, gate), cfg))
+    q = jnp.exp(encoder_logq(params, cfg, feat, b, gate))
     c = (q * jnp.exp(1j * grid(cfg))[None, :]).sum(-1)
     return jnp.angle(c), jnp.abs(c), q
 

@@ -1,10 +1,13 @@
 """Neural-encoder-only variant versus the gated encoder.
 
-gated_encoder             : the behavior expert enters the encoder with weight kappa (gate on in 90% of
-                            bins during training), and the behavior decoder VM(b | x, kappa) is in the ELBO.
-neural_encoder_only       : the encoder never sees behavior (gate off in every bin). Behavior enters only
-                            through the behavior decoder VM(b | x, kappa), which is kept.
-neural_encoder_only_warp  : as above, with a learned map g(x) from latent to mean behavior (3 harmonics).
+gated_encoder             : the full model. Both encoders are present, and the behavior encoder (a von Mises
+                            expert with weight kappa) drops out as kappa goes to 0. The behavior decoder
+                            VM(b | x, kappa) is in the ELBO. The gate is on in 90% of bins during training.
+gated_encoder_warp        : as above, with a learned map g(x) from latent to mean behavior (3 harmonics).
+                            The behavior encoder uses the same map, kappa cos(b - g(x)).
+neural_encoder_only       : ablation. The behavior encoder is removed (gate off in every bin), and behavior
+                            enters only through the behavior decoder.
+neural_encoder_only_warp  : the ablation with the learned map g(x).
 
 All variants are scored on held-out bins with the behavior input removed at test time: the error of
 decoding behavior from neural activity alone, g(mu(y)) against the noise-free mean behavior, plus held-out
@@ -23,6 +26,7 @@ from amortized_eiv import model as m
 
 VARIANTS = {
     "gated_encoder": dict(p_drop=0.1, cfg={}),
+    "gated_encoder_warp": dict(p_drop=0.1, cfg={"beh_warp": 3}),
     "neural_encoder_only": dict(p_drop=1.0, cfg={}),
     "neural_encoder_only_warp": dict(p_drop=1.0, cfg={"beh_warp": 3}),
 }
@@ -70,8 +74,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1])
+    ap.add_argument("--only", nargs="+", default=None, help="run only these variants and merge into the saved results")
     a = ap.parse_args()
-    out = {"strong": {}, "weak": {}, "biased": {}, "noisy": {}}
+    variants = {k: v for k, v in VARIANTS.items() if a.only is None or k in a.only}
+    out = json.load(open("results/neural_encoder_variant.json")) if a.only else {"strong": {}, "weak": {}, "biased": {}, "noisy": {}}
     bias = lambda x: x + 0.4 + 0.5 * np.sin(x)
     for seed in a.seeds:
         sets = [("strong", ae.simulate_shared(seed=seed, N=30, kappas=(8.0, 3.0, 0.5), tuning="gp")),
@@ -79,12 +85,12 @@ if __name__ == "__main__":
                 ("biased", ae.simulate_shared(seed=seed, N=30, kappas=(6.0,), tuning="gp", behavior_map=bias))]
         for grp, d in sets:
             for i, k in enumerate(d["kappas"]):
-                for name, v in VARIANTS.items():
+                for name, v in variants.items():
                     r = score(d, i, v, a.steps, seed)
                     out[grp].setdefault(f"kappa{k:g}", {}).setdefault(name, []).append(r)
                     print(grp, k, seed, name, {x: round(y, 3) for x, y in r.items()}, flush=True)
         json.dump(out, open("results/neural_encoder_variant.json", "w"), indent=2)
-    for name in ("gated_encoder", "neural_encoder_only"):
+    for name in (() if a.only else ("gated_encoder", "neural_encoder_only")):
         out["noisy"][name] = noisy(name, a.steps)
         print("noisy", name, {x: round(y, 3) for x, y in out["noisy"][name].items()}, flush=True)
     json.dump(out, open("results/neural_encoder_variant.json", "w"), indent=2)
