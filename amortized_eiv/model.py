@@ -46,6 +46,7 @@ class Config:
     depth: int = 1              # ReLU network depth for kernel = "nngp"
     beh_warp: int = 0           # harmonics of a learned map from latent to mean behavior (0 = identity)
     warp_sd: float = 0.5        # prior scale of the warp coefficients
+    objective: str = "joint"    # "joint": ELBO on log p(y, b). "conditional": ELBO on log p(y | b)
 
 
 def log_i0(k):
@@ -194,8 +195,19 @@ def elbo_per_bin(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     return elbo, log_marg
 
 
+def log_z_beh(params, cfg: Config, b, cond):
+    """log Z(b) = log sum_g p(x_g) VM(b | g(x_g), kappa), the normalizer of the conditional prior p(x | b)."""
+    kap = kappas(params, cfg)[cond]
+    lp = log_prior_grid(params, cfg)[None, :]
+    return jax.scipy.special.logsumexp(lp + log_beh_grid(cfg, b, kap, params), axis=-1)
+
+
 def loss_fn(params, cfg: Config, feat, y, b, cond, gate_mask=None):
     elbo, _ = elbo_per_bin(params, cfg, feat, y, b, cond, gate_mask)
+    if cfg.objective == "conditional":
+        # log p(y, b) = log p(y | b) + log Z(b) - log p_phi-normalizer terms; dropping log Z(b) leaves the
+        # ELBO on log p(y | b), so the model conditions on behavior and does not model it.
+        elbo = elbo - log_z_beh(params, cfg, b, cond)
     T = y.shape[0]
     pen = 0.5 * jnp.sum((params["W"] / tau(cfg)[:, None]) ** 2)
     pen = pen + 0.5 * jnp.sum(params["prior"] ** 2)

@@ -1,0 +1,16 @@
+standard 8.0 0 joint {'kappa': 8.119, 'heldout': -56.355, 'latent_err': 0.072, 'prior_entropy': 4.738}
+standard 8.0 0 conditional {'kappa': 8.217, 'heldout': -56.35, 'latent_err': 0.086, 'prior_entropy': 4.739}
+standard 3.0 0 joint {'kappa': 2.898, 'heldout': -57.099, 'latent_err': 0.073, 'prior_entropy': 4.736}
+standard 3.0 0 conditional {'kappa': 2.844, 'heldout': -57.095, 'latent_err': 0.084, 'prior_entropy': 4.782}
+standard 0.5 0 joint {'kappa': 0.426, 'heldout': -57.865, 'latent_err': 0.261, 'prior_entropy': 4.727}
+standard 0.5 0 conditional {'kappa': 0.427, 'heldout': -57.866, 'latent_err': 0.265, 'prior_entropy': 4.725}
+narrow 3.0 0 joint {'kappa': 2.675, 'heldout': -59.263, 'latent_err': 0.237, 'prior_entropy': 4.233}
+narrow 3.0 0 conditional {'kappa': 1.969, 'heldout': -59.235, 'latent_err': 0.394, 'prior_entropy': 4.703}
+standard 8.0 1 joint {'kappa': 7.893, 'heldout': -56.77, 'latent_err': 0.073, 'prior_entropy': 4.839}
+standard 8.0 1 conditional {'kappa': 7.98, 'heldout': -56.784, 'latent_err': 0.077, 'prior_entropy': 4.795}
+standard 3.0 1 joint {'kappa': 3.007, 'heldout': -57.275, 'latent_err': 0.085, 'prior_entropy': 4.839}
+standard 3.0 1 conditional {'kappa': 3.005, 'heldout': -57.279, 'latent_err': 0.081, 'prior_entropy': 4.846}
+standard 0.5 1 joint {'kappa': 0.417, 'heldout': -58.07, 'latent_err': 0.341, 'prior_entropy': 4.835}
+standard 0.5 1 conditional {'kappa': 0.422, 'heldout': -58.07, 'latent_err': 0.336, 'prior_entropy': 4.834}
+narrow 3.0 1 joint {'kappa': 2.717, 'heldout': -56.551, 'latent_err': 0.184, 'prior_entropy': 4.494}
+narrow 3.0 1 conditional {'kappa': 2.22, 'heldout': -56.56, 'latent_err': 0.374, 'prior_entropy': 4.743}

@@ -1,57 +1,63 @@
 # amortized-eiv
 
-Amortized error-in-variables (EIV) regression for neural population activity. The model infers a latent internal representation from neural activity and measured behavior, and learns how closely the two agree.
-
-This is research code. All results so far are on simulated data. It follows the setup of Garon, Keeley, and Williams (bioRxiv 2026, doi 10.64898/2026.04.22.720005) and changes how the latent is inferred and how the coupling to behavior is estimated.
+Amortized error-in-variables (EIV) regression for neural population activity. It is an encoder-based variant of the model in Garon, Keeley, and Williams, "Tracking the Fidelity of Internal Neural Representations with Error-In-Variables Regression" (bioRxiv 2026, doi 10.64898/2026.04.22.720005). This is research code, and all results so far are on simulated data.
 
 ## The idea
 
-Neuroscientists often fit tuning curves of neural activity against a measured sensory or behavioral variable b, such as heading direction. This treats b as noise-free. The internal representation x that the neurons actually encode can deviate from b, for example when sensory cues are removed or when tracking is noisy. When it does, conventional tuning curves flatten, and the loss of tuning looks like a change in the neurons when it is a change in how well x tracks b.
+### The problem, and the preprint's answer
 
-EIV regression models neural activity as tuned to a latent x, with behavior as a noisy observation of x. A fidelity parameter κ sets how tightly the two are coupled. Large κ gives conventional supervised tuning curves, and small κ gives an unsupervised latent variable model. The preprint chooses one κ per epoch by cross-validation and integrates over x by sampling.
+Tuning curves are usually fit against a measured behavioral variable b, such as heading direction, as if b were exact. The representation x that the neurons carry can differ from b, for example when sensory cues are removed, when tracking is noisy, or when path integration drifts. Conventional tuning curves then flatten. The flattening looks like a change in the neurons, when it is a change in how well x tracks b.
 
-This code makes three changes.
+The preprint models this directly. The latent is x = b + ε, where ε is von Mises noise with concentration κ. (The preprint writes the noise on either side, x = s + ε in its Results and s = x + ε in its Methods. Von Mises noise is symmetric, so the two agree.) Spikes are Poisson with tuning curves f_n(x) that have a Gaussian-process prior, written as a Fourier expansion. The concentration κ measures how faithfully x tracks b. Large κ gives the conventional tuning-curve model, and small κ gives an unsupervised latent variable model (a GPLVM). The preprint chooses κ for each epoch from a grid by cross-validated likelihood, and it integrates over x by quasi-Monte Carlo sampling or a particle filter. It applies the model to head-direction cells in mouse anterodorsal thalamus and to grid cells in rat entorhinal cortex.
 
-- An encoder infers x. It takes neural activity as input, and behavior enters through a gate set by κ, so the posterior is neural-only when behavior is noisy and pinned to behavior when it is reliable.
-- κ is learned by gradient and can differ by condition, instead of being scanned over a grid.
-- The prior on x is learned. When behavior is too noisy to constrain x, the fit is a generative model of neural activity with a learned prior.
+### This code: the same model, with an encoder and a learned noise scale
+
+The generative model is the preprint's: x = b + noise, then neural activity. Two limits show how it interpolates.
+
+- No noise (K = 0). Then x = b, and the model is the conventional supervised tuning-curve fit.
+- Large noise. The noise swamps b. The neural encoder, the neural decoder, and a prior on x that is learned from neural activity then determine x. Behavior no longer constrains it, and the model is a neural latent variable model.
+
+K is the noise scale. The code uses the von Mises concentration κ, which is about 1 / K² for small noise, so large noise corresponds to small κ.
 
 ![Model schematic](figures/model_schematic.png)
 
-| Regime | What the model is |
-| --- | --- |
-| κ → ∞ | Supervised tuning-curve model. The latent equals behavior. |
-| intermediate κ | Partially supervised EIV, as in the preprint. |
-| κ → 0 | Unsupervised latent variable model (VAE or GPLVM) with a learned prior. Behavior only aligns the latent afterward. |
+Behavior enters through the conditional prior p(x | b). It is b plus noise, renormalized by a prior p(x) that is learned from neural activity. As the noise grows, p(x | b) reduces to p(x), and the neural encoder q(x | y) and neural decoder p(y | x) do the rest. When both neural activity and behavior are available, the posterior over x is the product of the neural evidence and the behavior term. Both are von Mises, so they multiply by adding their complex parameters, with behavior weighted by κ. This is not a separate gate. The "gate" in the code, and the `p_drop` option, is this weight κ on the behavior term in the encoder.
+
+This code changes three things from the preprint. An encoder infers x instead of sampling over it. The noise scale is learned by gradient, one value per condition, instead of being chosen on a grid. The prior on x is learned instead of being uniform. Two options go further. A learned map from the latent to behavior handles systematic offsets between x and b, and a different tuning prior (an infinitely wide network kernel) can replace the Matérn-type default.
+
+| Noise scale K | Concentration κ | What the model is |
+| --- | --- | --- |
+| K = 0 | κ → ∞ | Supervised tuning-curve model. The latent equals behavior. This is the preprint's conventional analysis. |
+| intermediate | intermediate | Partially supervised EIV, as in the preprint. |
+| K large | κ → 0 | Neural latent variable model (VAE or GPLVM) with a learned prior. Behavior only aligns the latent afterward. |
 
 ## Model
 
 ```
-x_t        ~ p_phi(x)                             learned prior on the ring
-b_t | x_t  ~ VonMises(x_t, kappa_c(t))            behavior, one kappa per condition
-y_nt | x_t ~ Poisson(exp(b_n + Phi(x_t) W_n))     Fourier-basis tuning, smoothness prior on W
-q(x_t | y_t, b_t) = VM(arg z_t, |z_t|),   z_t = z_psi(y_t) + kappa_t * exp(i b_t)
+x_t | b_t  ~ p_phi(x) VM(x; b_t, kappa_c(t)) / Z(b_t)    b plus noise, renormalized by the learned prior
+y_nt | x_t ~ Poisson(exp(b_n + Phi(x_t) W_n))            neural decoder: Fourier-basis tuning, smoothness prior on W
+q(x_t | y_t, b_t) = VM(arg z_t, |z_t|),  z_t = z_psi(y_t) + kappa_t * exp(i b_t)      encoder: neural evidence + behavior term
 ```
 
-The encoder combines the neural evidence z_psi(y) and the behavioral evidence kappa exp(ib) by adding their complex parameters, which is the exact product of two von Mises densities. The gate strength is κ. At κ = 0 the encoder decodes from neural activity alone, which is what sleep and immobility decoding need.
+Here Z(b) is the integral of p_phi(x) VM(x; b, kappa) over x. The same model can be written the other way, with a prior p(x) and behavior generated from the latent, b | x ~ VM(x, κ). That form has the joint p(x) VM(b | x, κ) p(y | x). The two forms differ only by Z(b), which is constant for a flat prior. At κ = 0 the encoder decodes from neural activity alone, which is what sleep and immobility decoding need.
 
-![Gate fusion](figures/gate_fusion.png)
+![Posterior as behavior's weight grows](figures/gate_fusion.png)
 
-*Left: the posterior over x for fixed neural evidence at 0.6 rad and behavior at −0.4 rad, as the gate opens. Right: the posterior mean moves from the neural estimate to behavior as κ grows, and the posterior sharpens.*
+*Left: the posterior over x for fixed neural evidence at 0.6 rad and behavior at −0.4 rad, as the weight κ on behavior grows. Right: the posterior mean moves from the neural estimate to behavior as κ grows, and the posterior sharpens.*
 
-The training objective is the ELBO on log p(y, b):
+The default training objective is the ELBO on log p(y, b), which models behavior as well:
 
 ```
 E_q[ log p(y | x) + kappa cos(b - x) - log 2 pi I0(kappa) ] - KL( q(x | y, b) || p_phi(x) )
 ```
 
-The behavior term depends on q through its first circular moment, which gives the update for κ:
+The conditional objective, `Config(objective="conditional")`, subtracts log Z(b) and so is the ELBO on log p(y | b). The two are identical for a flat prior and are compared below. The behavior term depends on q through its first circular moment, which gives the update for κ:
 
 ```
 I1(kappa) / I0(kappa) = mean over t of  rho_t cos(b_t - mu_t),     rho_t e^{i mu_t} = E_q[e^{ix}]
 ```
 
-The right side is small when the posterior is broad or displaced from behavior. Then κ goes to 0, p(x | b) goes to the prior, and behavior has no gradient on x. Training randomly zeroes the encoder gate in a fraction of bins. The generative model is unchanged, so the ELBO stays a valid bound.
+The right side is small when the posterior is broad or displaced from behavior. Then κ goes to 0, p(x | b) goes to the learned prior, and behavior has no gradient on x. Training randomly omits the behavior term from the encoder in a fraction of bins (`p_drop`). The generative model is unchanged, so the ELBO stays a valid bound, and the neural path stays accurate for decoding without behavior.
 
 The tuning-curve weights have a Gaussian prior whose spectrum sets the smoothness of the curves, which is the weight-space form of a Gaussian process. The default is Matérn-type. An infinitely wide ReLU network kernel is available as an option and is compared below.
 
@@ -61,10 +67,11 @@ On the ring the latent lives on a grid of 128 points, so the ELBO is an exact su
 
 - κ and the latent are recovered on simulated ring data. Learned κ is within 15% of the truth in the strong-information ring test.
 - The preprint's simulated examples (Fig 1 and Fig 2) are reproduced, including the held-out likelihood peak at the true κ.
-- The gate helps where behavior is informative and has no effect where it is noisy.
+- Giving the encoder behavior helps where behavior is informative and has no effect where it is noisy.
 - When behavior is nearly noise, the fit reproduces the neural mean rates and covariance.
 - In one dimension the amortized model is not faster, except that learning κ in one fit is about 6 times cheaper than a grid over κ with folds. Baselines can learn κ too.
 - In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ.
+- The joint objective, which also models behavior, learns a sharper prior and a better κ than the conditional objective when the latent occupies a small part of the ring. They agree otherwise.
 - Removing the behavior encoder costs κ accuracy with weak neural information. A learned behavior decoder, with both encoders kept, recovers κ and decodes behavior when behavior is offset from the latent.
 - Replacing the Matérn-type tuning prior with an infinitely wide ReLU network kernel (NNGP) brings no gain over a smoother Matérn prior. Depth 1 fails when tuning curves have energy at odd harmonics above 1.
 
@@ -84,9 +91,9 @@ Simulated ring data, 3000 steps, seed 0. Errors are the mean circular error of t
 | 1 | 3.0 | 2.75 | 0.14 | 0.53 |
 | 2 | 0.5 | 0.43 | 0.12 | 1.30 |
 
-With weak neural information (N = 8, low rates), the gate helps where behavior is informative and has no effect where it is not. κ is underestimated for the cleanest condition (3.72 against 8.0).
+With weak neural information (N = 8, low rates), giving the encoder behavior helps where behavior is informative and has no effect where it is not. κ is underestimated for the cleanest condition (3.72 against 8.0).
 
-| Condition | κ true | κ learned | Gate on | Gate off | Raw behavior |
+| Condition | κ true | κ learned | With behavior | Neural activity only | Raw behavior |
 | --- | --- | --- | --- | --- | --- |
 | 0 | 8.0 | 3.72 | 0.27 | 0.52 | 0.29 |
 | 1 | 3.0 | 2.36 | 0.39 | 0.58 | 0.49 |
@@ -231,7 +238,7 @@ In this test an architecture-derived prior brought no advantage over tuning the 
 
 ### Both encoders, an ablation, and a learned behavior decoder
 
-The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent when κ is 0. The neural encoder, the neural decoder, and the behavior decoder stay. This is the gated encoder described above. An earlier version of this section presented removing the behavior encoder as a second formulation. It is an ablation, and it is reported here as one.
+The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent when the noise is large and κ is near 0. The neural encoder, the neural decoder, and the behavior decoder stay. This is the full model described above. Removing the behavior encoder is an ablation, which is tested here.
 
 ![Architecture variants](figures/architecture_variants.png)
 
@@ -276,23 +283,46 @@ Setup (`scripts/neural_encoder_variant.py`, about 16 minutes). Ring data with 80
 - At κ = 0.5 the full model kept the latent's coordinate frame on both seeds, with and without the learned decoder (decode error 0.26 and 0.34, and 0.27 and 0.24). The ablation without the learned decoder failed on one of two seeds (0.22 and 1.48). With the learned decoder it did not (0.22 and 0.26). This is two seeds and is an observation, not a rate.
 - With weak neural information the full model learns a κ closer to the truth. At true κ = 8 it learns 5.46 to 5.47 against 3.44 to 3.45 for the ablations, and at true κ = 3 it learns 2.60 to 2.61 against 2.23 to 2.24. Held-out differs by 0.03 and 0.01 nats per bin. Without the behavior encoder, the encoder has to infer x from few spikes, so κ is underestimated. This is the amortization gap again. Decoding behavior from eight neurons alone is worse than the raw measurement in every variant.
 - With a systematic offset between latent and behavior, the learned behavior decoder helps. With the identity decoder the full model has decode error 0.164 and κ of 5.22. With the learned decoder it has 0.083 and 6.01 (true 6), and held-out improves by 0.08 nats per bin. The ablation with the learned decoder gives 0.075 and 5.91. The tuning curves absorb part of an offset, which is why the identity versions are not worse by more.
-- With nearly noise behavior (κ = 0.1, T = 3000, one seed), the full model and the ablation both become neural generative models. Learned κ is 0.108 and 0.119. Samples from the learned prior match the data in mean rate (r = 0.988 and 0.986) and neural covariance (r = 0.997 and 0.996). The aligned latent error differs, at 0.34 and 0.76 rad. The runs differ in their training-time gate and random stream, so I treat that as run-to-run variation, and it was not tested.
+- With nearly noise behavior (κ = 0.1, T = 3000, one seed), the full model and the ablation both become neural generative models. Learned κ is 0.108 and 0.119. Samples from the learned prior match the data in mean rate (r = 0.988 and 0.986) and neural covariance (r = 0.997 and 0.996). The aligned latent error differs, at 0.34 and 0.76 rad. The runs differ in how often behavior is shown to the encoder during training and in their random streams, so I treat that as run-to-run variation, and it was not tested.
 
 The full model with a learned behavior decoder was within 0.02 rad of the best decode error in every setting, and it had the best or tied-best κ in the weak-information and offset settings. Removing the behavior encoder cost κ accuracy with weak neural information and, on one seed, the latent's coordinate frame.
 
+### Joint and conditional objectives
+
+In the x = b + noise story the model conditions on b. The conditional objective is the ELBO on log p(y | b). The joint objective is the ELBO on log p(y, b), which also models b. They differ by log Z(b). That term is constant for a flat prior, where the two objectives are identical (checked in `tests/test_variant.py`), and it matters when the prior is learned.
+
+Setup (`scripts/conditional_objective.py`, about 5 minutes). Ring data with 80% of the bins for training and 20% for scoring, κ learned for 3000 steps, and 2 seeds. The standard data are the Fig 2 setup. In the narrow-occupancy data the latent random walk has a small step (0.05), so it stays in a small part of the ring, where a learned prior matters most. The uniform prior has entropy ln 128 = 4.85 nats. The entropy column is the entropy of the learned prior.
+
+| Data, true κ | Objective | κ learned | Held-out log p(y given b) | Latent error (rad) | Entropy of learned prior (nats) |
+| --- | --- | --- | --- | --- | --- |
+| standard, 8.0 | Joint | 8.01 | −56.563 | 0.072 | 4.79 |
+| standard, 8.0 | Conditional | 8.10 | −56.567 | 0.082 | 4.77 |
+| standard, 3.0 | Joint | 2.95 | −57.187 | 0.079 | 4.79 |
+| standard, 3.0 | Conditional | 2.92 | −57.187 | 0.083 | 4.81 |
+| standard, 0.5 | Joint | 0.42 | −57.968 | 0.301 | 4.78 |
+| standard, 0.5 | Conditional | 0.42 | −57.968 | 0.301 | 4.78 |
+| narrow occupancy, 3.0 | Joint | 2.70 | −57.907 | 0.211 | 4.36 |
+| narrow occupancy, 3.0 | Conditional | 2.09 | −57.898 | 0.384 | 4.72 |
+
+- On the standard data the objectives agree. Held-out scores differ by at most 0.014 nats per bin on a seed, and learned κ differs by 0.1 or less.
+- With narrow occupancy the joint objective learns a sharper prior (entropy 4.36 against 4.72 nats) and a κ closer to the truth (2.70 against 2.09, true 3). Its latent error is 0.21 against 0.38. The direction is the same on both seeds. Held-out log p(y | b) is unchanged (−57.91 and −57.90).
+- A likely reason is that the distribution of b tells the joint objective where the latent lives, and the conditional objective discards that information. This was not tested. With two seeds, treat it as an observation.
+
 ## Design notes
 
-How κ is chosen. κ is learned by gradient, one value per condition, starting at 2 and clipped to 0.001 to 500, on the negative ELBO together with the decoder and encoder. At the optimum, I₁(κ) / I₀(κ) equals the mean of ρ cos(b − μ). The preprint fixes κ on a grid and picks the value with the best held-out likelihood. Here the grid appears only as a check in the Fig 2 reproduction (9 values, 2 folds). The Fourier cutoff is fixed at 12 harmonics on the ring and K = 3 on the torus (24 frequencies). It is not chosen from data, and its sensitivity was not tested.
+How the noise scale is chosen. κ is learned by gradient, one value per condition, starting at 2 and clipped to 0.001 to 500, on the negative ELBO together with the decoder and encoder. At the optimum, I₁(κ) / I₀(κ) equals the mean of ρ cos(b − μ). The preprint fixes κ on a grid and picks the value with the best held-out likelihood. Here the grid appears only as a check in the Fig 2 reproduction (9 values, 2 folds). The Fourier cutoff is fixed at 12 harmonics on the ring and K = 3 on the torus (24 frequencies). It is not chosen from data, and its sensitivity was not tested. (This K is the Fourier cutoff and is unrelated to the noise scale K above.)
 
-What the approach enables. Learning κ by gradient does not need the encoder. Baselines with the same decoder and a learned κ recover it as well or better (6 to 22 s on the ring), and the preprint's likelihood is also differentiable in κ, so this is a change of protocol. What the encoder adds is behavior-free decoding in one forward pass, and a natural place for a time-varying κ, which is not implemented.
+Behavior is not a gate. Given the latent, the behavior term is a von Mises density, exp(κ cos(b − x)), with complex parameter κ e^{ib}. Von Mises densities multiply by adding their complex parameters, so the exact posterior is z = z_ψ(y) + κ e^{ib}. Behavior's weight is the noise concentration κ itself, and there are no extra trust parameters. This is exact on the ring if z_ψ is read as an amortized likelihood and the prior is flat. On the torus the encoder is a Gaussian network with behavior scaled by κ as an input, which is not exact. Adding the behavior term has not been compared with concatenating b into the network.
 
-Why behavior gates the encoder input. Given the latent, the behavior term is a von Mises density, exp(κ cos(b − x)), with complex parameter κ e^{ib}. Von Mises densities multiply by adding their complex parameters, so the exact posterior is z = z_ψ(y) + κ e^{ib}, and the gate is κ itself with no extra trust parameters. This is exact on the ring if z_ψ is read as an amortized likelihood and the prior is flat. On the torus the encoder is a Gaussian network with behavior scaled by κ as an input, which is not exact. The gate has not been compared with concatenating b into the network.
+What the encoder enables. Learning κ by gradient does not need the encoder. Baselines with the same decoder and a learned κ recover it as well or better (6 to 22 s on the ring), and the preprint's likelihood is also differentiable in κ, so this is a change of protocol. What the encoder adds is decoding without behavior in one forward pass, and a natural place for a time-varying κ, which is not implemented.
 
-Encoders and decoders. The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent at κ = 0 while the neural encoder, the neural decoder, and the behavior decoder remain. Removing the behavior encoder is an ablation. With strong neural information it makes no difference. With weak neural information it lowers the learned κ, and on one seed at κ = 0.5 it lost the latent's coordinate frame. A learned behavior decoder, with the behavior encoder kept consistent with it, handles a systematic offset between latent and behavior.
+The prior when the noise is large. The conditional prior is p(x | b) ∝ p_φ(x) VM(x; b, κ). As κ goes to 0 it becomes p_φ(x), which is fit to the latents that the neural data occupy. The model is then a neural encoder and decoder with a learned prior, and samples from it match the data's mean rates and covariance. A network that learns p(x | b) directly, as in the original sketch, is not implemented. The learned behavior decoder, with the matching behavior encoder, is the closest analogue.
 
-The prior when behavior is noisy. The conditional prior is p(x | b) ∝ p_φ(x) VM(b | x, κ). As κ goes to 0 it becomes p_φ(x), which is fit to the latents that the neural data occupy. The model is then a neural VAE with a learned prior, and samples from it match the data's mean rates and covariance. A network that learns p(x | b) directly, as in the original sketch, is not implemented. The learned behavior decoder, with the matching behavior encoder, is the closest analogue.
+Joint and conditional objectives. They agree when the latent covers the ring. When the latent occupies a small part of it, the joint objective, which also models b, gives a sharper prior and a better κ.
 
-The tuning prior. The decoder's weight prior is the weight-space form of a Gaussian process with a Matérn-type spectrum. An infinitely wide ReLU network kernel (NNGP) is available as an option and gave no advantage over a smoother Matérn prior. This is the NNGP and not the neural tangent kernel, because the latent is learned and the tangent kernel's fixed-feature regime does not apply.
+Encoders and decoders. The model has a neural encoder and decoder and a behavior encoder and decoder. The behavior encoder is a von Mises term with weight κ, so it is effectively absent when the noise is large. The neural encoder, the neural decoder, and the behavior decoder remain. Removing the behavior encoder is an ablation. With strong neural information it makes no difference. With weak neural information it lowers the learned κ, and on one seed at κ = 0.5 it lost the latent's coordinate frame. A learned behavior decoder, with the behavior encoder kept consistent with it, handles a systematic offset between latent and behavior.
+
+The tuning prior. The decoder's weight prior is the weight-space form of a Gaussian process with a Matérn-type spectrum, as in the preprint. An infinitely wide ReLU network kernel (NNGP) is available as an option and gave no advantage over a smoother Matérn prior. This is the NNGP and not the neural tangent kernel, because the latent is learned and the tangent kernel's fixed-feature regime does not apply.
 
 Against the preprint's approach. On the ring, learning κ in one fit is about 6 times cheaper than a grid with folds, and the fit is as good or slightly better on one fold. That saving is available to any baseline that learns κ. In a 2D latent the amortized model is cheaper per step but fits worse and underestimates κ, and the integrator baselines are still cheap enough at 1024 points. The case where amortization should win, a latent of three or more dimensions, is untested.
 
@@ -306,6 +336,7 @@ Against the preprint's approach. On the ring, learning κ in one fit is about 6 
 - Not compared against the authors' code, which is not public as far as I could find. The preprint refers to "the software package" without a link. The speed comparisons use stand-in baselines, and an L-BFGS baseline was tried. The preprint's own implementation was not.
 - The speed results are from one dataset, one fold, and a one-dimensional latent. In the 2D torus the amortized model was cheaper per step but did not match the integrators' fit quality or recover κ. Latents of three or more dimensions are untested.
 - The kernel comparison uses two seeds and simulated data. The default Matérn hyperparameters were not tuned, and only a ReLU network without bias was tried, with depth as the only architecture choice. Real tuning curves were not tested.
+- The joint and conditional comparison uses two seeds, and the narrow-occupancy case is a single simulated setup.
 - The behavior-encoder comparison uses two seeds and simulated data. The learned behavior decoder has 3 harmonics, and the offset it recovers was built into the simulation.
 - One κ per condition. There is no within-condition drift, no dynamical prior, and no multi-region coupling. The ring latent is a grid of 128 points, a fixed approximation.
 
@@ -315,7 +346,7 @@ Against the preprint's approach. On the ring, learning κ in one fit is about 6 
 - Learn a conditional prior p(x | b) with a network and compare it with the learned warp.
 - Add a time-varying κ and test whether it tracks transitions in the simulated data.
 - Choose the Matérn smoothness by cross-validation and compare that with the NNGP prior.
-- Compare the gate with concatenating b into the encoder network.
+- Compare adding the behavior term to the encoder with concatenating b into the encoder network.
 - Run on the ADn and grid-cell recordings, and compare with the authors' code if it is released.
 - Repeat the held-out comparisons over more seeds and folds.
 
@@ -335,6 +366,7 @@ python scripts/kernel_comparison.py     # ring tuning-prior comparison, about 10
 python scripts/kernel_comparison.py --control   # Matérn smoothness control, about 3 minutes
 python scripts/kernel_torus2d.py        # torus tuning-prior comparison, about 5 minutes
 python scripts/neural_encoder_variant.py   # behavior-encoder ablation and learned behavior decoder, about 16 minutes
+python scripts/conditional_objective.py    # joint versus conditional objective, about 5 minutes
 python scripts/make_figures.py          # rebuild figures/ from the saved results
 ```
 
@@ -348,7 +380,7 @@ mu0, rho0, _ = ae.posterior(params, cfg, feat, d["b"], d["cond"], use_behavior=F
 
 | Path | Contents |
 | --- | --- |
-| `amortized_eiv/model.py` | Ring model, ELBO, encoder with gate |
+| `amortized_eiv/model.py` | Ring model, ELBO, encoder with the behavior term |
 | `amortized_eiv/torus2d.py` | 2D torus model and the three fitting methods |
 | `amortized_eiv/baseline.py` | Quasi-Monte Carlo and exact-grid baselines |
 | `amortized_eiv/kernels.py` | Tuning priors: Matérn-type and ReLU NNGP spectra |

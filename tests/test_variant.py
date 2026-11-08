@@ -62,3 +62,23 @@ def test_behavior_encoder_follows_the_learned_decoder():
                                * jnp.exp(1j * m.grid(cfg))[None, :]).sum(-1)))
     back = np.asarray(m.beh_mean_at(p, cfg, jnp.asarray(mu)))       # g(mu) should land on b
     assert np.abs(np.angle(np.exp(1j * (back - np.asarray(b))))).mean() < 0.15
+
+
+def test_conditional_objective_equals_joint_minus_log_z_and_is_identical_for_a_flat_prior():
+    d = simulate_shared(seed=4, N=10, T=60, kappas=(3.0,), tuning="gp")
+    y, b = jnp.asarray(d["y"]), jnp.asarray(d["b"][0])
+    z = jnp.zeros(60, int)
+    feat, _ = features(y)
+    for learn_prior in (False, True):
+        cj = Config(N=10, G=64, learn_prior=learn_prior)
+        cc = Config(N=10, G=64, learn_prior=learn_prior, objective="conditional")
+        p = init_params(jax.random.PRNGKey(0), cj, y)
+        if learn_prior:
+            p["prior"] = jnp.array([0.8, -0.3, 0.2, 0.1, 0.0, -0.2])
+        lj, lc = m.loss_fn(p, cj, feat, y, b, z), m.loss_fn(p, cc, feat, y, b, z)
+        expected = lj + float(jnp.mean(m.log_z_beh(p, cj, b, z)))
+        np.testing.assert_allclose(lc, expected, atol=1e-4)
+        if not learn_prior:        # flat prior: log Z(b) is constant in b, so the gradients agree
+            gj = jax.grad(m.loss_fn)(p, cj, feat, y, b, z)
+            gc = jax.grad(m.loss_fn)(p, cc, feat, y, b, z)
+            np.testing.assert_allclose(gj["W"], gc["W"], atol=1e-4)

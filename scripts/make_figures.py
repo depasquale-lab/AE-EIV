@@ -41,41 +41,43 @@ def arrow(ax, a, b, text=None, off=(0, 0), color="#444444", fs=9, rad=0.0):
 
 
 def fig_model():
-    fig, axs = plt.subplots(1, 2, figsize=(13, 5.2), gridspec_kw={"width_ratios": [1, 1.25]})
+    fig, axs = plt.subplots(1, 2, figsize=(15.5, 5.6), gridspec_kw={"width_ratios": [1.0, 1.05], "wspace": 0.12})
     ax = axs[0]
-    ax.set_xlim(0, 10); ax.set_ylim(0, 8); ax.axis("off")
-    ax.set_title("Generative model", loc="left", fontweight="bold")
-    box(ax, (3.2, 6.6), 3.6, 0.9, "learned prior  p(x)", fs=10)
-    node(ax, (5.0, 4.9), 0.62, "x$_t$")
-    arrow(ax, (5.0, 6.55), (5.0, 5.55))
-    node(ax, (1.9, 2.5), 0.62, "b$_t$", fc="#e9e9e9")
-    node(ax, (8.1, 2.5), 0.62, "y$_{nt}$", fc="#e9e9e9")
-    arrow(ax, (4.5, 4.45), (2.3, 2.95), "von Mises\nwith fidelity κ$_t$", off=(-1.35, 0.35))
-    arrow(ax, (5.5, 4.45), (7.7, 2.95), "Poisson with\ntuning f$_n$(x)", off=(1.35, 0.35))
-    ax.text(1.9, 1.35, "measured behavior\n(noisy, may decouple)", ha="center", fontsize=9, color="#555555")
-    ax.text(8.1, 1.35, "spike counts\n(neuron n, bin t)", ha="center", fontsize=9, color="#555555")
-    ax.text(5.0, 0.25, "x is the internal representation. κ says how tightly it tracks behavior.",
-            ha="center", fontsize=9.5, style="italic")
-
+    ax.set_xlim(0, 11); ax.set_ylim(0, 8); ax.axis("off")
+    ax.set_title("The model: x = b + noise, then neural activity", loc="left", fontweight="bold")
+    node(ax, (1.0, 4.0), 0.62, "b", fc="#e9e9e9")
+    node(ax, (5.2, 4.0), 0.62, "x")
+    node(ax, (9.8, 4.0), 0.62, "y", fc="#e9e9e9")
+    arrow(ax, (1.65, 4.0), (4.55, 4.0))
+    ax.text(3.1, 4.55, "+ noise ε", ha="center", fontsize=9.5)
+    ax.text(3.1, 3.3, "scale K\n(concentration κ)", ha="center", va="top", fontsize=8.5, color="#555555")
+    arrow(ax, (5.85, 4.0), (9.15, 4.0))
+    ax.text(7.5, 4.55, "tuning f$_n$(x)", ha="center", fontsize=9.5)
+    ax.text(7.5, 3.3, "Poisson spikes", ha="center", va="top", fontsize=8.5, color="#555555")
+    ax.text(1.0, 2.9, "measured\nbehavior", ha="center", va="top", fontsize=8.5, color="#555555")
+    ax.text(5.2, 3.0, "internal\nrepresentation", ha="center", va="top", fontsize=8.5, color="#555555")
+    box(ax, (3.9, 6.3), 2.6, 1.0, "prior p(x)\nlearned from neural data", fc="#eaf6ee", ec="#2e9e5b", fs=8.5)
+    arrow(ax, (5.2, 6.25), (5.2, 4.7), color="#2e9e5b")
+    ax.text(7.4, 6.45, "takes over when the\nnoise is large", fontsize=8.5, color="#2e9e5b", va="center")
+    ax.text(5.5, 1.75, "K = 0:  x = b. This is the conventional supervised tuning-curve model.", ha="center", fontsize=9.5)
+    ax.text(5.5, 1.1, "K large:  b is swamped by the noise, and x is set by the neural encoder,", ha="center", fontsize=9.5)
+    ax.text(5.5, 0.55, "decoder, and prior. The model is then a neural latent variable model.", ha="center", fontsize=9.5)
     ax = axs[1]
     ax.set_xlim(0, 12); ax.set_ylim(0, 8); ax.axis("off")
-    ax.set_title("Encoder with a behavior gate", loc="left", fontweight="bold")
-    node(ax, (1.0, 5.6), 0.55, "y$_t$", fc="#e9e9e9")
-    box(ax, (2.2, 5.1), 2.7, 1.0, "network\nz$_ψ$(y$_t$)", fs=10)
-    arrow(ax, (1.55, 5.6), (2.2, 5.6))
-    node(ax, (7.3, 5.6), 0.45, "+", fs=14)
-    arrow(ax, (4.9, 5.6), (6.85, 5.6))
-    node(ax, (1.0, 2.4), 0.55, "b$_t$", fc="#e9e9e9")
-    box(ax, (2.2, 1.9), 2.7, 1.0, "gate\nκ$_t$ · e$^{i b_t}$", fc="#fdf1df", ec="#e08a1e", fs=10)
-    arrow(ax, (1.55, 2.4), (2.2, 2.4))
-    arrow(ax, (4.9, 2.4), (7.1, 5.25), rad=-0.15)
-    box(ax, (8.6, 5.1), 3.0, 1.0, "q(x | y, b)\nvon Mises", fs=10)
-    arrow(ax, (7.75, 5.6), (8.6, 5.6))
-    ax.text(6.0, 0.55, "κ$_t$ → 0:  b is ignored, the posterior comes from neural activity alone",
-            ha="center", fontsize=9.5)
-    ax.text(6.0, 0.05, "κ$_t$ → ∞:  the posterior is pinned to behavior, x = b", ha="center", fontsize=9.5)
-    ax.text(8.6, 3.9, "z = z$_ψ$(y) + κ e$^{ib}$\nposterior mean = arg z\nconcentration = |z|",
-            fontsize=9, va="top", color="#555555")
+    ax.set_title("Relation to the preprint (Garon, Keeley, Williams)", loc="left", fontweight="bold")
+    ax.text(5.1, 7.25, "Preprint", ha="center", fontsize=10, fontweight="bold", color="#444444")
+    ax.text(9.4, 7.25, "This code", ha="center", fontsize=10, fontweight="bold", color="#1f5fa8")
+    rows = [("Model", "x = b + von Mises noise,\nGP tuning, Poisson spikes", "same model"),
+            ("Finding x", "sample x: quasi-Monte Carlo\nor particle filter", "encoder q(x | y, b)"),
+            ("Noise scale", "grid of κ values, chosen by\ncross-validation per epoch", "learned by gradient,\nper condition"),
+            ("Prior on x", "uniform", "learned"),
+            ("Without b", "decode with the fitted\ntuning curves", "weight κ set to 0 in the\nencoder, one forward pass")]
+    y0 = 6.4
+    for i, (lab, a_, b_) in enumerate(rows):
+        yy = y0 - i * 1.3
+        ax.text(0.2, yy, lab, ha="left", va="center", fontsize=9.5, fontweight="bold")
+        box(ax, (2.6, yy - 0.5), 5.0, 1.0, a_, fc="#f3f3f3", ec="#bbbbbb", fs=8.5)
+        box(ax, (7.9, yy - 0.5), 3.9, 1.0, b_, fc="#eef3fa", ec="#1f5fa8", fs=8.5)
     fig.savefig(f"{OUT}/model_schematic.png")
     plt.close(fig)
 
@@ -95,13 +97,13 @@ def fig_gate():
     ax.text(0.65, ax.get_ylim()[1] * 0.93, "neural\nevidence", fontsize=8, color="#1f5fa8")
     ax.text(b - 0.12, ax.get_ylim()[1] * 0.93, "behavior", fontsize=8, color="#d62728", ha="right")
     ax.set_xlabel("latent angle x (rad)"); ax.set_ylabel("posterior density")
-    ax.set_title("Posterior as the gate opens", loc="left"); ax.legend(frameon=False, fontsize=9)
+    ax.set_title("Posterior as behavior's weight κ grows", loc="left"); ax.legend(frameon=False, fontsize=9)
     ax = axs[1]
     ks = np.logspace(-2, 2, 200)
     z = zy + ks * np.exp(1j * b)
     ax.semilogx(ks, np.angle(z), color="#1f5fa8", lw=2, label="posterior mean")
     ax.axhline(0.6, color="#1f5fa8", ls=":", lw=1); ax.axhline(b, color="#d62728", ls=":", lw=1)
-    ax.set_xlabel("gate strength κ"); ax.set_ylabel("posterior mean (rad)")
+    ax.set_xlabel("weight of behavior κ (large κ = small noise)"); ax.set_ylabel("posterior mean (rad)")
     ax2 = ax.twinx(); ax2.spines["right"].set_visible(True)
     ax2.semilogx(ks, np.abs(z), color="#e08a1e", lw=2, label="concentration")
     ax2.set_ylabel("concentration |z|", color="#e08a1e")
@@ -135,8 +137,8 @@ def fig_smoke():
         off = [d["latent_mae_gate_off"][f"cond{c}"] for c in range(3)]
         on = [d["latent_mae_gate_on"][f"cond{c}"] for c in range(3)]
         ax.bar(idx - w, raw, w, color="#bbbbbb", label="raw behavior")
-        ax.bar(idx, off, w, color=C["amort2"], label="encoder, gate off")
-        ax.bar(idx + w, on, w, color=C["amort"], label="encoder, gate on")
+        ax.bar(idx, off, w, color=C["amort2"], label="encoder, neural activity only")
+        ax.bar(idx + w, on, w, color=C["amort"], label="encoder with behavior")
         ax.set_xticks(idx); ax.set_xticklabels([f"κ = {k:g}" for k in kt])
         ax.set_ylabel("mean circular error (rad)"); ax.set_title(ttl, loc="left")
         if key == "strong": ax.legend(frameon=False, fontsize=8)
@@ -443,15 +445,15 @@ def fig_architecture():
     arrow(ax, (6.7, 4.0), (7.6, 5.1)); arrow(ax, (6.7, 3.5), (7.6, 2.4))
     node(ax, (11.2, 5.3), 0.5, "ŷ", fc="#e9e9e9"); node(ax, (11.2, 2.2), 0.5, "b̂", fc="#e9e9e9")
     arrow(ax, (10.1, 5.3), (10.7, 5.3)); arrow(ax, (10.1, 2.2), (10.7, 2.2))
-    ax.text(2.7, 1.3, "weight κ, so it is effectively\nabsent when κ = 0", fontsize=8, color="#c0701a", ha="center", va="top")
-    ax.text(6.2, 0.55, "κ → 0: the behavior encoder drops out. The neural encoder, neural decoder,\nand behavior decoder remain. g(x) = x by default, or a learned warp.",
+    ax.text(2.7, 1.3, "weight κ: effectively absent when\nthe noise is large (κ → 0)", fontsize=8, color="#c0701a", ha="center", va="top")
+    ax.text(6.2, 0.55, "κ → 0 (large noise): the behavior encoder drops out. The neural encoder, neural decoder,\nand behavior decoder remain. g(x) = x by default, or a learned warp.",
             ha="center", va="top", fontsize=9)
     ax = axs[1]
     ax.set_title("Ablation: behavior encoder removed", loc="left", fontweight="bold", fontsize=10.5)
     node(ax, (0.6, 5.3), 0.5, "y", fc="#e9e9e9")
     box(ax, (1.5, 4.8), 2.4, 1.0, "neural encoder\nq(x | y)", fc=ENC[0], ec=ENC[1], fs=9)
     arrow(ax, (1.1, 5.3), (1.5, 5.3))
-    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\n(removed: gate off\nin every bin)", fc="white", ec="#aaaaaa", fs=8, ls="--", tc="#999999")
+    box(ax, (1.5, 1.7), 2.4, 1.0, "behavior encoder\n(removed in\nevery bin)", fc="white", ec="#aaaaaa", fs=8, ls="--", tc="#999999")
     node(ax, (6.3, 3.75), 0.5, "x")
     arrow(ax, (3.9, 5.3), (5.85, 4.0))
     box(ax, (7.6, 4.8), 2.5, 1.0, "neural decoder\np(y|x)", fc=DEC[0], ec=DEC[1], fs=9)
